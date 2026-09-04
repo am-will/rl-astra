@@ -4,7 +4,7 @@ import { FIELD, BLUE, ORANGE } from './config';
 import type { Pad } from './physics';
 import { detailedCar, detailedBall } from './models';
 import { arenaSurfaces, sideBoundary, honeycombMaterial } from './arena';
-import { createLargeBoostPad } from './boost-pad';
+import { createLargeBoostPad, createSmallBoostPad } from './boost-pad';
 
 function turfTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 1536; canvas.height = 2048;
@@ -61,8 +61,7 @@ function endStandOpening(row: number) {
 }
 export class Stadium {
   padMeshes: T.Group[] = [];
-  private padPickups: T.Object3D[] = [];
-  private padOrbs: (T.Mesh | undefined)[] = [];
+  private padAnimations: ((cooldown: number, time: number) => void)[] = [];
   goalLights: T.PointLight[] = [];
   wallMaterial!: T.ShaderMaterial;
   constructor(public scene: T.Scene, pads: Pad[]) {
@@ -163,18 +162,11 @@ export class Stadium {
     this.makeSky(scene);
     mergeStatic(endStands); mergeStatic(architecture);
     architecture.traverse(o => { if (o instanceof T.Mesh) { o.castShadow = false; if (!Array.isArray(o.material)) fadeNearCamera(o.material); } });
-    const gold = material(0xc39a42, .65, .35), padGlow = new T.MeshStandardMaterial({ color: 0xffa132, emissive: 0xff901b, emissiveIntensity: 1.7 });
     const padHalo = glowTexture();
     for (const pad of pads) {
-      if (pad.big) {
-        const model = createLargeBoostPad(padHalo); model.root.position.set(pad.x, .045, pad.z); scene.add(model.root);
-        this.padMeshes.push(model.root); this.padPickups.push(model.pickup); this.padOrbs.push(model.orb); continue;
-      }
-      const group = new T.Group(); group.position.set(pad.x, .045, pad.z); scene.add(group);
-      const base = new T.Mesh(new T.CylinderGeometry(.65, .8, .07, 12), material(0x253232, .8, .4)); group.add(base);
-      const ring = new T.Mesh(new T.TorusGeometry(.49, .055, 6, 24), gold); ring.rotation.x = Math.PI / 2; ring.position.y = .055; group.add(ring);
-      const light = new T.Mesh(new T.CylinderGeometry(.32, .4, .06, 8), padGlow.clone()); light.position.y = .1; group.add(light);
-      this.padMeshes.push(group); this.padPickups.push(light); this.padOrbs.push(undefined);
+      const model = pad.big ? createLargeBoostPad(padHalo) : createSmallBoostPad();
+      model.root.position.set(pad.x, .045, pad.z); scene.add(model.root);
+      this.padMeshes.push(model.root); this.padAnimations.push(model.update);
     }
   }
   makeCrowd(scene: T.Scene) {
@@ -222,11 +214,7 @@ export class Stadium {
     }
   }
   update(pads: Pad[], time: number) {
-    pads.forEach((p, i) => {
-      this.padPickups[i].visible = p.cooldown <= 0;
-      const orb = this.padOrbs[i];
-      if (orb) { orb.rotation.y = time * 1.5; orb.position.y = .8 + Math.sin(time * 3) * .12; }
-    });
+    pads.forEach((p, i) => this.padAnimations[i](p.cooldown, time));
   }
   updateCamera(position: T.Vector3) {
     const distance = Math.min(FIELD.width - Math.abs(position.x), FIELD.length - Math.abs(position.z));

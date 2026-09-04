@@ -42,7 +42,7 @@ export class HUD {
       ['Drive / steer', ['forward', 'reverse', 'left', 'right']], ['Jump · hold for height / recover', ['jump']],
       ['Rocket boost', ['boost']], ['Air pitch / yaw', ['pitchDown', 'pitchUp', 'yawLeft', 'yawRight']],
       ['Air roll left / right', ['rollLeft', 'rollRight']], ['Air roll modifier', ['airRoll']],
-      ['E-brake / powerslide', ['drift']], ['Ball camera', ['camera']], ['Unlimited boost', ['unlimited']], ['Reset car', ['reset']], ['Pause / sound / fullscreen', ['pause', 'sound', 'fullscreen']],
+      ['E-brake / powerslide', ['drift']], ['Ball camera', ['camera']], ['Unlimited boost', ['unlimited']], ['Reset car', ['reset']], ['Restart match', ['restart']], ['Pause / sound / fullscreen', ['pause', 'sound', 'fullscreen']],
     ];
     const list = this.root.querySelector('.control-list')!; list.replaceChildren();
     for (const [name, ids] of rows) {

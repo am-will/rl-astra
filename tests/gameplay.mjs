@@ -16,6 +16,7 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/arena.png' });
   check('WebGL scene and detailed assets load', await run(() => window.__game.view.player.root.children.some(x => x.isMesh && x.geometry.attributes.position.count > 1000)), {});
+  check('New match starts with ball cam on', await run(() => window.__game.view.ballCam && document.querySelector('#camera-status').textContent === 'ON'), {});
   await page.keyboard.down('w');
   await page.waitForFunction(() => window.__game.phase === 'playing');
   await page.waitForFunction(() => window.__game.physics.player.body.translation().z < 25);
@@ -33,7 +34,9 @@ try {
   check('B enables unlimited boost', await run(() => window.__game.physics.unlimited), {});
   await page.keyboard.press('b');
   await page.keyboard.press('c');
-  check('C toggles ball camera', await run(() => window.__game.view.ballCam), {});
+  check('C toggles ball camera off', await run(() => !window.__game.view.ballCam && document.querySelector('#camera-status').textContent === 'OFF'), {});
+  await page.keyboard.press('c');
+  check('C toggles ball camera back on', await run(() => window.__game.view.ballCam), {});
   await page.keyboard.press('h');
   check('Controls guide opens', await page.locator('#help-panel').isVisible(), {});
   await page.getByRole('button', { name: "LET'S PLAY" }).click();

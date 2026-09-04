@@ -29,7 +29,7 @@ export class GameRenderer {
   effects: Effects;
   boosts: [RocketBoost, RocketBoost];
   audio = new GameAudio();
-  ballCam = false;
+  ballCam = true;
   shake = 0;
   time = 0;
   look = new T.Vector3();

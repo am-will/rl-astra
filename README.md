@@ -40,6 +40,7 @@ Browser tests use Chrome at its standard macOS path. Set `CHROME_PATH` to a diff
 | Ctrl / PgDn | E-brake / powerslide |
 | C | Toggle ball camera |
 | R | Recover car to kickoff position |
+| 5 / Numpad 5 | Restart match |
 | Esc / P | Pause |
 | H | Full controls |
 | M | Mute / unmute |

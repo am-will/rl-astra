@@ -21,6 +21,7 @@ export class Game {
     await this.physics.init();
     this.view = new GameRenderer(document.querySelector('#app')!, this.physics);
     this.hud.set('quality-value', this.view.quality ? 'HIGH' : 'PERFORMANCE');
+    this.hud.camera(this.view.ballCam);
     try { await this.view.loadAssets(); } catch (error) { console.warn('Detailed assets unavailable; using the procedural car and ball.', error); }
     this.hud.onAction = action => this.action(action);
     this.controlsMenu = new ControlsMenu(this.controls, this.hud.root);
@@ -99,7 +100,7 @@ export class Game {
     this.view.effects.explosion.reset();
     this.view.effects.demolitions.reset(); this.goalBlastPending = false;
     this.blue = this.orange = 0; this.remaining = MATCH_LENGTH; this.overtime = false; this.phase = 'ready'; this.paused = false;
-    this.physics.reset(); this.view.cameraReady = false; this.hud.pause(false); this.hud.message('MAKE YOUR PLAY.', 'THE STAGE IS YOURS', '', 'ready'); this.hud.bindings(this.controls);
+    this.physics.reset(); this.view.ballCam = true; this.hud.camera(true); this.view.cameraReady = false; this.hud.pause(false); this.hud.message('MAKE YOUR PLAY.', 'THE STAGE IS YOURS', '', 'ready'); this.hud.bindings(this.controls);
   }
   botInput(): Input {
     const car = this.physics.bot, pos = new Vector3().copy(car.body.translation()), ball = new Vector3().copy(this.physics.ball.translation());

@@ -21,6 +21,7 @@ export const ACTIONS = [
   { id: 'camera', label: 'Toggle ball camera', category: 'match', keys: ['KeyC'], pad: [button(3)] },
   { id: 'pause', label: 'Pause / options', category: 'match', keys: ['Escape', 'KeyP'], pad: [button(9)] },
   { id: 'reset', label: 'Reset car', category: 'match', keys: ['KeyR'], pad: [button(12)] },
+  { id: 'restart', label: 'Restart match', category: 'match', keys: ['Digit5', 'Numpad5'], pad: [] },
   { id: 'unlimited', label: 'Unlimited boost', category: 'match', keys: ['KeyB'], pad: [button(13)] },
   { id: 'help', label: 'Controls guide', category: 'match', keys: ['KeyH'], pad: [button(8)] },
   { id: 'sound', label: 'Mute / unmute', category: 'match', keys: ['KeyM'], pad: [] },
