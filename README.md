@@ -1,0 +1,93 @@
+# Champions Field
+
+A playable local car-soccer game built with Three.js, Rapier, TypeScript, and Vite. It opens directly on the pitch. All models, textures, fonts, and sounds are served or generated locally.
+
+## Run
+
+```sh
+npm install
+npm run dev
+```
+
+Open **http://127.0.0.1:5179/**. Press **W** or squeeze **R2** to begin the three-second kickoff. DualSense works through Chrome’s Gamepad API over USB or Bluetooth. Focus the tab and press a controller button to make it available to the browser.
+
+```sh
+npm run build     # Type-check and build production files
+npm run preview   # Serve the production build
+npm test          # Gameplay, arena, aerial control, keyboard/controller, and settings checks
+npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
+npm run test:feel  # Impact calibration, goal clearance/ramp driving, camera framing and refresh rates
+npm run test:impact # Goal blast control, demolitions, subtle ball trail, clear goal net, saved quality
+npm run test:impact-visuals # Goal interior and demolition drive-through screenshots
+npm run test:feel-live # Record actual high-ball, wall and goal-wall play with camera/frame-time metrics
+npm run test:play # Record a live play session and capture screenshots
+npm run test:visuals  # Inspect ramps, goal interiors, ceiling, and explosion stages
+npm run test:showcase # Record both goal explosions and measure frame times
+```
+
+Browser tests use Chrome at its standard macOS path. Set `CHROME_PATH` to a different Chrome/Chromium executable if necessary. The game server must be running for tests. Test output is saved to `test-results/`. On a fresh machine, run `npx playwright install ffmpeg` once before recording video.
+
+## Controls
+
+| Key | Action |
+| --- | --- |
+| WASD / arrow keys | Drive and steer; pitch and yaw in the air |
+| Space | Jump; hold for more height; hop upright when resting upside down |
+| Space again | Double jump; hold a direction for a dodge |
+| Shift | Rocket boost |
+| **B** | **Toggle unlimited boost** |
+| Q / E | Air roll left / right |
+| Ctrl / PgDn | E-brake / powerslide |
+| C | Toggle ball camera |
+| R | Recover car to kickoff position |
+| Esc / P | Pause |
+| H | Full controls |
+| M | Mute / unmute |
+| F | Fullscreen |
+
+Open **Esc / Options → Controls & bindings** to replace, add, or remove keyboard keys and controller buttons/axis directions. Settings save automatically in this browser. Driving, Aerial, and Match & menu tabs cover every action. Stick/dodge deadzones and steering/aerial sensitivities are adjustable. The connection indicator and live input monitor show what Chrome receives. Escape always goes back, even if its binding is removed. Controller menus use the left stick/D-pad, Cross to select, Circle to go back, and Options to pause/resume. Disconnecting the active controller pauses play.
+
+| DualSense default | Action |
+| --- | --- |
+| R2 / L2 | Analog accelerate / brake and reverse |
+| Left stick | Steer; pitch/yaw in air; direction for a dodge |
+| Cross | Jump, double jump/dodge, self-righting hop |
+| Circle | Boost |
+| Square | Powerslide; hold with left stick to air roll |
+| L1 / R1 | Air roll left / right |
+| Triangle | Ball camera |
+| Options | Pause / resume |
+| Create / Share | Controls guide |
+| D-pad up / down | Reset car / toggle unlimited boost |
+
+Land all four wheel traces on the ball to regain the flip. Opposing pitch cancels an ongoing forward/backward flip. Landing on the wheels cancels a dodge and allows wavedash-style recovery. Small boost pads provide 12 boost and respawn after four seconds; large pads refill the tank and respawn after ten seconds.
+
+Performance rendering is the default, with the same models, shadows, textures and explosion animations and no bloom. The visual-quality selection is saved across reloads. High enables bloom and additional pixel density; Performance avoids the intermittent dark flashing reported with High in Chrome.
+
+The pause menu includes solo practice, a five-minute match against Maverick, restart, unlimited boost, audio, and performance rendering. Tied matches enter sudden-death overtime. The clock stays at zero while a live ball is airborne.
+
+## Implementation
+
+- `src/arena.ts`: Shared curved collision/render meshes, tapered goal entrances, rounded goal interiors, 20.48-unit ceiling, and procedural honeycomb.
+- `src/physics.ts`: Rapier rigid bodies, four-wheel suspension traces, curved wall transitions, contact impulses, jump/dodge control, pads, goal detection, and demolitions.
+- `src/game.ts`: Fixed 120 Hz simulation, bot behavior, match lifecycle, input actions, and development-only test scenarios.
+- `src/render.ts`: Interpolated car/ball poses between 120 Hz physics steps, lighting, shadowing, bloom, and effects.
+- `src/follow-camera.ts`: Smooth angular orbit, spring distance, gradual mode transitions, two-subject ball framing, high-ball field of view, and collision avoidance against opaque ramps. Transparent arena walls do not pin the camera to the car.
+- `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
+- `src/models.ts`: Detailed Octane and ball assets, material setup, and independent wheel pivots.
+- `src/effects.ts`: Boost fire, sparse short-lived ball speed sparks, skid marks, and synthesized audio.
+- `src/demolition.ts`: Reusable fireballs, expanding shock rings, spark streaks, tumbling tires/body fragments, BOOM lettering, and thin smoke that clears quickly and fades near the camera.
+- `src/goal-explosion.ts`, `src/blast-pass.ts`: Stellar Collapse goal celebration: plasma corona, singularity and accretion disk, 15,000 GPU particles, branching lightning, curved energy jets, ground shockwave, screen refraction, dynamic lighting, and bass/rumble audio. Geometry is reused between goals.
+- `src/ball-marker.ts`: High-contrast, height-scaled ground reticle, projected onto the floor and ramps.
+- `src/controls.ts`, `src/bindings.ts`: Keyboard and polled Gamepad API inputs, analog deadzones, edge-triggered actions, safe hotplug handling, validated persistent bindings.
+- `src/controls-menu.ts`, `src/hud.ts`, `src/style.css`: Rebinding/capture UI, controller status and live monitor, tuning, responsive match UI and active-device hints.
+
+Goal interiors use 2.56-unit floor fillets, tapering flush at the mouth, with wider rounded back corners. All curved goal surfaces share transparent honeycomb; their collision shapes remain fully driveable. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
+
+Goal celebrations keep the cars and all driving/aerial inputs active. The blast launches nearby cars more strongly and fades with distance; the match clock and scored ball stay stopped until the next kickoff. Demolished cars are temporarily disabled in place so the camera remains above the field before respawn.
+
+The car and ball use credited detailed models. Champions Field is a procedural reconstruction inspired by the original stadium, not the original map asset. The field uses the documented 81.92 × 102.4 × 20.48 dimensions, with a 2.56-unit floor fillet and smoothly joined corner planes. Handling constants for speed, gravity, jump, boost acceleration, air torque/damping, and fuel consumption are derived from RocketSim's reference values, scaled into this world. Air roll caps at 5.5 rad/s (roughly 1.14 seconds per sustained turn). A normal directional dodge completes one bounded rotation with a 0.3-second pitch recovery lock; opposite pitch still cancels it. Suspension only pushes away from a surface. Wheel adhesion follows RocketSim’s baseline 0.5 g plus an orientation-dependent wall force; on a flat ceiling it cannot cancel gravity, so wheel contact releases naturally and greater speed carries the car farther. Jumping while the chassis rests upside down starts a 0.4-second recovery roll with a 2-unit/s hop, inspired by RocketSim’s auto-flip constants. Rapier suspension and collision response are independently implemented; this is not a frame-exact reimplementation of Rocket League or a network multiplayer client.
+
+See [CREDITS.md](./CREDITS.md) for model, font, and reference attribution.
+
+Controller tests inject a standard DualSense-shaped Gamepad API device into a separate automated Chrome session. They cover analog input, one-shot actions, remapping, persistence, menu navigation, disconnect/reconnect, and live driving/recovery. This validates the browser input path, not a physical controller’s USB/Bluetooth connection.

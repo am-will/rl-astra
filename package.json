@@ -1,0 +1,32 @@
+{
+  "name": "champions-field",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs",
+    "test:play": "node tests/play-session.mjs",
+    "test:visuals": "node tests/refinement-visuals.mjs",
+    "test:showcase": "node tests/refinement-play.mjs",
+    "test:controls": "node tests/controls-ceiling.mjs",
+    "test:feel": "node tests/feel.mjs",
+    "test:feel-live": "node tests/feel-live.mjs",
+    "test:impact": "node tests/impact.mjs",
+    "test:impact-visuals": "node tests/impact-visuals.mjs",
+    "test:impact-live": "node tests/impact-live.mjs"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@types/three": "^0.183.1",
+    "playwright": "^1.58.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

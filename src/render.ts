@@ -1,0 +1,149 @@
+import * as T from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { createBall, createCarModel, type CarModel } from './assets';
+import { Effects, GameAudio } from './effects';
+import { Stadium, glowTexture } from './stadium';
+import { FIELD, CAR } from './config';
+import type { Physics, Car } from './physics';
+import { loadDetailedModels, detailedCar, detailedBall } from './models';
+import { createBallMarker } from './ball-marker';
+import { createBlastPass } from './blast-pass';
+import { FollowCamera } from './follow-camera';
+
+export class GameRenderer {
+  scene = new T.Scene();
+  camera = new T.PerspectiveCamera(69, innerWidth / innerHeight, .15, 550);
+  renderer: T.WebGLRenderer;
+  composer: EffectComposer;
+  bloom: UnrealBloomPass;
+  blast = createBlastPass();
+  stadium: Stadium;
+  player: CarModel; bot: CarModel;
+  ball: T.Group;
+  ballGround: T.Mesh;
+  effects: Effects;
+  audio = new GameAudio();
+  ballCam = false;
+  shake = 0;
+  time = 0;
+  look = new T.Vector3();
+  cameraForward = new T.Vector3(0, 0, -1);
+  cameraReady = false;
+  followCamera = new FollowCamera();
+  quality = false;
+  private playerWasDemolished = false;
+  constructor(container: HTMLElement, public physics: Physics) {
+    try { this.quality = localStorage.getItem('champions-field.quality') === 'high'; } catch { /* Use Performance when storage is unavailable. */ }
+    this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(this.quality ? Math.min(devicePixelRatio, 1.5) : 1); this.renderer.setSize(innerWidth, innerHeight);
+    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.renderer.info.autoReset = false;
+    this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
+    this.renderer.domElement.id = 'game-canvas'; this.renderer.domElement.setAttribute('aria-label', '3D car soccer arena. Use W A S D to drive.'); container.prepend(this.renderer.domElement);
+    this.scene.background = new T.Color(0x0b172d); this.scene.fog = new T.FogExp2(0x102139, .0045);
+    const pmrem = new T.PMREMGenerator(this.renderer); const env = new RoomEnvironment(); this.scene.environment = pmrem.fromScene(env, .04).texture; pmrem.dispose(); env.dispose(); this.scene.environmentIntensity = .48;
+    this.scene.add(new T.HemisphereLight(0xc5e1ff, 0x233524, 1.25));
+    const moon = new T.DirectionalLight(0xe2f2ff, 2.2); moon.position.set(-25, 65, 22); moon.castShadow = true;
+    moon.shadow.mapSize.set(2048, 2048); moon.shadow.camera.left = -65; moon.shadow.camera.right = 65; moon.shadow.camera.top = 65; moon.shadow.camera.bottom = -65; moon.shadow.camera.far = 160; moon.shadow.bias = -.0005; moon.shadow.normalBias = .025;
+    this.scene.add(moon);
+    const fill = new T.DirectionalLight(0x90c9ff, 1.1); fill.position.set(45, 24, -35); this.scene.add(fill);
+    this.stadium = new Stadium(this.scene, physics.pads);
+    this.player = createCarModel('blue'); this.bot = createCarModel('orange'); this.scene.add(this.player.root, this.bot.root);
+    this.player.root.scale.setScalar(.5); this.bot.root.scale.setScalar(.5);
+    this.ball = createBall(); this.scene.add(this.ball);
+    this.ballGround = createBallMarker(); this.scene.add(this.ballGround);
+    // Soft contact shadows preserve weight under the broad stadium lighting.
+    for (const owner of [this.player.root, this.bot.root, this.ball]) {
+      const shadow = new T.Mesh(new T.PlaneGeometry(2.6, 2.6), new T.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: .57, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2; shadow.userData.owner = owner; shadow.name = 'contact-shadow'; this.scene.add(shadow);
+    }
+    this.effects = new Effects(this.scene);
+    this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
+    this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
+    window.addEventListener('resize', () => this.resize());
+    this.update(0, 'ready');
+  }
+  async loadAssets() {
+    const source = await loadDetailedModels();
+    const old = [this.player.root, this.bot.root, this.ball];
+    this.player = detailedCar(source.car, 'blue', this.player.flames);
+    this.bot = detailedCar(source.car, 'orange', this.bot.flames);
+    this.ball = detailedBall(source.ball);
+    const replacement = [this.player.root, this.bot.root, this.ball];
+    old.forEach(o => this.scene.remove(o)); replacement.forEach(o => this.scene.add(o));
+    this.scene.children.filter(o => o.name === 'contact-shadow').forEach(o => { const index = old.indexOf(o.userData.owner); if (index >= 0) o.userData.owner = replacement[index]; });
+    this.stadium.addMonument(source.car, source.ball);
+    old.forEach(root => root.traverse(o => { if (o instanceof T.Mesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } }));
+    this.update(0, 'ready');
+  }
+  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); }
+  toggleQuality() {
+    this.quality = !this.quality;
+    const pixelRatio = this.quality ? Math.min(devicePixelRatio, 1.5) : 1;
+    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.resize();
+    try { localStorage.setItem('champions-field.quality', this.quality ? 'high' : 'performance'); } catch { /* The selected mode still applies for this session. */ }
+  }
+  syncCar(model: CarModel, car: Car, dt: number, alpha: number) {
+    model.root.visible = car.demolished <= 0;
+    model.root.position.lerpVectors(car.previousPosition, new T.Vector3().copy(car.body.translation()), alpha); model.root.quaternion.slerpQuaternions(car.previousRotation, new T.Quaternion().copy(car.body.rotation()), alpha);
+    for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
+    for (const flame of model.flames) { flame.visible = car.boosting; flame.scale.y = .4 + Math.random() * .3; }
+    if (car.boosting && dt > 0) {
+      const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
+      for (let i = 0; i < 5; i++) this.effects.emit(new T.Vector3((i % 2 ? 1 : -1) * .25, .05, .8).applyQuaternion(model.root.quaternion).add(model.root.position), behind.clone().multiplyScalar(4), i % 3 ? 0xffac3e : 0xdffaff, .18 + Math.random() * .2, .1);
+      this.effects.puff(new T.Vector3(0, .03, 1.3).applyQuaternion(model.root.quaternion).add(model.root.position), behind.clone().multiplyScalar(2), .25, .38);
+    }
+    if (car.speed > CAR.supersonic && dt > 0) for (const x of [-.45, .45]) this.effects.emit(new T.Vector3(x, -.1, .5).applyQuaternion(model.root.quaternion).add(model.root.position), new T.Vector3(), 0xbde8ff, .35, .02);
+    if (car.drifting && car.grounded && car.speed > 4 && dt > 0 && model.root.position.y < .65) {
+      for (const x of [-.43, .43]) {
+        const point = new T.Vector3(x, -.32, .46).applyQuaternion(model.root.quaternion).add(model.root.position);
+        this.effects.skid(point, (model === this.player ? 0 : 2) + (x > 0 ? 1 : 0)); this.effects.puff(point, new T.Vector3(0, .3, 0), .2, .55);
+      }
+    }
+  }
+  update(dt: number, phase: string, celebration?: T.Vector3, alpha = 1) {
+    this.time += dt;
+    this.syncCar(this.player, this.physics.player, dt, alpha); this.syncCar(this.bot, this.physics.bot, dt, alpha); this.bot.root.visible &&= this.physics.botEnabled;
+    this.ball.visible = phase !== 'goal';
+    this.ball.position.lerpVectors(this.physics.ballPreviousPosition, new T.Vector3().copy(this.physics.ball.translation()), alpha); this.ball.quaternion.slerpQuaternions(this.physics.ballPreviousRotation, new T.Quaternion().copy(this.physics.ball.rotation()), alpha);
+    const ground = this.physics.groundBelow(this.ball.position);
+    const markerRadius = 1.55 + Math.sqrt(Math.max(0, this.ball.position.y - ground.position.y - FIELD.ballRadius)) * .46;
+    this.ballGround.scale.setScalar(markerRadius);
+    this.ballGround.position.copy(ground.position).addScaledVector(ground.normal, .045);
+    this.ballGround.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), ground.normal);
+    this.ballGround.visible = phase !== 'goal';
+    this.effects.ballTrail(this.ball.position, new T.Vector3().copy(this.physics.ball.linvel()), dt, this.ball.visible);
+    for (const obj of this.scene.children) if (obj.name === 'contact-shadow') {
+      const owner = obj.userData.owner as T.Object3D; obj.position.set(owner.position.x, .025, owner.position.z); obj.visible = owner.visible;
+      (obj as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>).material.opacity = .55 / Math.max(1, owner.position.y * .55);
+    }
+    this.stadium.update(this.physics.pads, this.time); this.effects.update(dt);
+    this.bloom.strength = .32 + this.effects.explosion.impact * .35;
+    this.renderer.toneMappingExposure = 1.05 - this.effects.explosion.impact * .16;
+    const car = this.physics.player, pos = this.player.root.position, q = this.player.root.quaternion;
+    if (this.playerWasDemolished && car.demolished <= 0) this.cameraReady = false;
+    this.playerWasDemolished = car.demolished > 0;
+    const focus = phase === 'goal' && celebration ? this.effects.explosion.root.position : this.ball.position;
+    this.followCamera.update(this.camera, pos, q, focus, car.demolished > 0 ? 0 : car.speed, this.ballCam, car.flipTime > 0, dt, !this.cameraReady, (from, to) => this.physics.cameraClearance(from, to));
+    if (dt > 0 || !this.cameraReady) { this.cameraForward.copy(this.followCamera.forward); this.look.copy(this.followCamera.look); }
+    this.cameraReady = true;
+    this.shake = Math.max(0, this.shake - dt * 1.5);
+    // Render shake never feeds back into the next frame's follow position.
+    if (dt > 0) { this.camera.position.x += (Math.random() - .5) * (this.shake * .15 + this.effects.explosion.impact * .35); this.camera.position.y += (Math.random() - .5) * (this.shake * .1 + this.effects.explosion.impact * .23); }
+    this.camera.updateMatrixWorld();
+    this.effects.demolitions.updateCamera(this.camera.position);
+    this.stadium.updateCamera(this.camera.position);
+    const blastCenter = this.effects.explosion.root.position.clone().project(this.camera);
+    this.blast.enabled = this.effects.explosion.root.visible && blastCenter.z < 1 && Number.isFinite(blastCenter.x) && Number.isFinite(blastCenter.y);
+    this.blast.uniforms.center.value.set(blastCenter.x * .5 + .5, blastCenter.y * .5 + .5);
+    this.blast.uniforms.time.value = this.effects.explosion.age;
+    this.blast.uniforms.aspect.value = this.camera.aspect;
+    this.audio.update(car.speed, car.boosting, (phase === 'playing' || phase === 'goal') && car.demolished <= 0 && dt > 0);
+  }
+  draw() { this.renderer.info.reset(); this.composer.render(); }
+}
