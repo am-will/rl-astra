@@ -13,6 +13,7 @@ import { loadDetailedModels, detailedCar, detailedBall } from './models';
 import { createBallMarker } from './ball-marker';
 import { createBlastPass } from './blast-pass';
 import { FollowCamera } from './follow-camera';
+import { RocketBoost } from './rocket-boost';
 
 export class GameRenderer {
   scene = new T.Scene();
@@ -26,6 +27,7 @@ export class GameRenderer {
   ball: T.Group;
   ballGround: T.Mesh;
   effects: Effects;
+  boosts: [RocketBoost, RocketBoost];
   audio = new GameAudio();
   ballCam = false;
   shake = 0;
@@ -62,6 +64,7 @@ export class GameRenderer {
       shadow.rotation.x = -Math.PI / 2; shadow.userData.owner = owner; shadow.name = 'contact-shadow'; this.scene.add(shadow);
     }
     this.effects = new Effects(this.scene);
+    this.boosts = [new RocketBoost(this.scene), new RocketBoost(this.scene)];
     this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
     this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
@@ -71,8 +74,8 @@ export class GameRenderer {
   async loadAssets() {
     const source = await loadDetailedModels();
     const old = [this.player.root, this.bot.root, this.ball];
-    this.player = detailedCar(source.car, 'blue', this.player.flames);
-    this.bot = detailedCar(source.car, 'orange', this.bot.flames);
+    this.player = detailedCar(source.car, 'blue');
+    this.bot = detailedCar(source.car, 'orange');
     this.ball = detailedBall(source.ball);
     const replacement = [this.player.root, this.bot.root, this.ball];
     old.forEach(o => this.scene.remove(o)); replacement.forEach(o => this.scene.add(o));
@@ -92,11 +95,11 @@ export class GameRenderer {
     model.root.visible = car.demolished <= 0;
     model.root.position.lerpVectors(car.previousPosition, new T.Vector3().copy(car.body.translation()), alpha); model.root.quaternion.slerpQuaternions(car.previousRotation, new T.Quaternion().copy(car.body.rotation()), alpha);
     for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
-    for (const flame of model.flames) { flame.visible = car.boosting; flame.scale.y = .4 + Math.random() * .3; }
-    if (car.boosting && dt > 0) {
+    const active = car.boosting && car.demolished <= 0 && (car !== this.physics.bot || this.physics.botEnabled);
+    this.boosts[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, new T.Vector3().copy(car.body.linvel()), active, dt);
+    if (active && dt > 0 && Math.random() < dt * 35) {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
-      for (let i = 0; i < 5; i++) this.effects.emit(new T.Vector3((i % 2 ? 1 : -1) * .25, .05, .8).applyQuaternion(model.root.quaternion).add(model.root.position), behind.clone().multiplyScalar(4), i % 3 ? 0xffac3e : 0xdffaff, .18 + Math.random() * .2, .1);
-      this.effects.puff(new T.Vector3(0, .03, 1.3).applyQuaternion(model.root.quaternion).add(model.root.position), behind.clone().multiplyScalar(2), .25, .38);
+      this.effects.emit(new T.Vector3(Math.random() < .5 ? -.255 : .255, .025, 1.6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
     }
     if (car.speed > CAR.supersonic && dt > 0) for (const x of [-.45, .45]) this.effects.emit(new T.Vector3(x, -.1, .5).applyQuaternion(model.root.quaternion).add(model.root.position), new T.Vector3(), 0xbde8ff, .35, .02);
     if (car.drifting && car.grounded && car.speed > 4 && dt > 0 && model.root.position.y < .65) {

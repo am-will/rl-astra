@@ -36,7 +36,7 @@ function profile(parent: T.Object3D, points: number[][], width: number, mat: T.M
   geometry.rotateY(-Math.PI / 2); geometry.translate(width / 2, 0, 0);
   const mesh = new T.Mesh(geometry, mat); mesh.castShadow = true; parent.add(mesh); return mesh;
 }
-export interface CarModel { root: T.Group; wheels: T.Group[]; flames: T.Mesh[]; }
+export interface CarModel { root: T.Group; wheels: T.Group[]; }
 export function createCarModel(team: 'blue' | 'orange'): CarModel {
   const root = new T.Group(), body = new T.Group(); root.add(body);
   const color = team === 'blue' ? BLUE : ORANGE;
@@ -99,14 +99,7 @@ export function createCarModel(team: 'blue' | 'orange'): CarModel {
     }
     mergeStatic(wheel);
   }
-  const flames: T.Mesh[] = [];
-  for (const x of [-.51, .51]) {
-    const flame = new T.Mesh(new T.ConeGeometry(.22, 2, 10, 1, true), new T.MeshBasicMaterial({ color: 0xffbd52, transparent: true, opacity: .8, blending: T.AdditiveBlending, depthWrite: false }));
-    flame.rotation.x = Math.PI / 2; flame.position.set(x, .06, 2.4); flame.visible = false; root.add(flame); flames.push(flame);
-    const core = new T.Mesh(new T.ConeGeometry(.11, 1.4, 8), new T.MeshBasicMaterial({ color: 0xd7f5ff, blending: T.AdditiveBlending }));
-    core.rotation.x = Math.PI / 2; core.position.set(x, .06, 2.15); core.visible = false; root.add(core); flames.push(core);
-  }
-  return { root, wheels, flames };
+  return { root, wheels };
 }
 export function createBall() {
   const group = new T.Group(), radius = FIELD.ballRadius;

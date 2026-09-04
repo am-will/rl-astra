@@ -8,7 +8,7 @@ export async function loadDetailedModels() {
   const [car, ball] = await Promise.all([loader.loadAsync('/models/octane/scene.gltf'), loader.loadAsync('/models/ball/scene.gltf')]);
   return { car: car.scene, ball: ball.scene };
 }
-export function detailedCar(source: T.Group, team: 'blue' | 'orange', flames: T.Mesh[]): CarModel {
+export function detailedCar(source: T.Group, team: 'blue' | 'orange'): CarModel {
   const root = new T.Group(), baked = source.clone(true);
   baked.rotation.y = Math.PI / 2; baked.updateMatrixWorld(true);
   const bounds = new T.Box3().setFromObject(baked), center = bounds.getCenter(new T.Vector3());
@@ -39,13 +39,12 @@ export function detailedCar(source: T.Group, team: 'blue' | 'orange', flames: T.
     meshes.forEach(mesh => { mesh.geometry.translate(-center.x, -center.y, -center.z); group.add(mesh); });
     group.position.copy(center); group.rotation.order = 'YXZ'; group.userData.front = key.startsWith('F'); root.add(group); wheels.push(group);
   }
-  for (const flame of flames) { flame.position.multiplyScalar(.5); flame.scale.setScalar(.5); root.add(flame); }
   // Headlamps and exhaust cores are emissive inserts, independent of the painted body.
   const glow = new T.MeshStandardMaterial({ color: 0xc5efff, emissive: 0x9adfff, emissiveIntensity: 2 });
   for (const x of [-.5, .5]) {
     const lamp = new T.Mesh(new T.SphereGeometry(.0275, 10, 6), glow); lamp.position.set(x * .5, -.06, -.73); lamp.scale.set(1.4, .65, .4); root.add(lamp);
   }
-  return { root, wheels, flames };
+  return { root, wheels };
 }
 export function detailedBall(source: T.Group) {
   const root = new T.Group(); source.updateMatrixWorld(true);

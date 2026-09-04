@@ -20,7 +20,7 @@ export class HUD {
       <header class="identity">${shield}<div class="wordmark">ROCKET<br>LEAGUE</div><span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> NIGHT <span>·</span> LOCAL MATCH</span></div></header>
       <div class="scoreboard" aria-label="Match scoreboard"><div class="team team-blue"><span>YOU</span><strong id="blue-score">0</strong></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">5:00</strong><i id="overtime">OVERTIME</i></div><div class="team team-orange"><strong id="orange-score">0</strong><span>MAVERICK</span></div></div>
       <nav class="top-actions" aria-label="Game settings"><span class="live-label"><i></i> LOCAL PLAY</span><button data-action="sound" aria-label="Toggle sound" title="Toggle sound (M)">${icon('sound')}</button><button data-action="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">${icon('expand')}</button><button data-action="pause" aria-label="Pause game" title="Pause (Esc)">${icon('pause')}</button></nav>
-      <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title">MAKE YOUR PLAY.</h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
+      <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
       <div id="goal-flash"></div>
       <div id="bot-name" class="player-label orange">MAVERICK <span>▾</span></div>
@@ -54,11 +54,24 @@ export class HUD {
     }
   }
   el(id: string) { return document.getElementById(id)!; }
-  set(id: string, value: string | number) { const el = this.el(id); const text = String(value); if (el.textContent !== text) el.textContent = text; }
+  set(id: string, value: string | number) {
+    const el = this.el(id), text = String(value);
+    if (id === 'message-title' || id === 'event-toast') {
+      let face = el.querySelector<HTMLElement>('.comic-face');
+      if (!face) { face = document.createElement('span'); face.className = 'comic-face'; el.replaceChildren(face); }
+      if (face.textContent !== text) face.textContent = text;
+      el.dataset.text = text;
+    } else if (el.textContent !== text) el.textContent = text;
+  }
   ready() { this.el('loading').remove(); }
   message(title: string, kicker = '', sub = '', style = '') {
     const el = this.el('center-message'); el.className = `center-message ${style}`; el.hidden = !title;
     this.set('message-title', title); this.set('message-kicker', kicker); this.el('message-sub').innerHTML = sub;
+    if (title && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.el('message-title').animate([
+      { transform: 'rotate(-3deg) scale(.65)', opacity: 0 },
+      { transform: 'rotate(-3deg) scale(1.09)', opacity: 1, offset: .65 },
+      { transform: 'rotate(-3deg) scale(1)', opacity: 1 },
+    ], { duration: 330, easing: 'cubic-bezier(.16,1,.3,1)' });
   }
   toast(text: string) { this.set('event-toast', text); this.el('event-toast').classList.add('visible'); this.messageUntil = performance.now() + 2200; }
   update(data: { blue: number; orange: number; time: number; boost: number; speed: number; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; }) {

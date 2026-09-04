@@ -75,12 +75,16 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 - `src/follow-camera.ts`: Smooth angular orbit, spring distance, gradual mode transitions, two-subject ball framing, high-ball field of view, and collision avoidance against opaque ramps. Transparent arena walls do not pin the camera to the car.
 - `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
 - `src/models.ts`: Detailed Octane and ball assets, material setup, and independent wheel pivots.
+- `src/boost-pad.ts`: Low three-lobed silver housings, recessed sockets, and amber inserts for full boost pickups. The housing remains visible during cooldown.
+- `src/rocket-boost.ts`: Animated twin orange afterburners with bright cores, rippling edges, lateral drift, and smooth release; no continuous boost smoke cloud.
 - `src/effects.ts`: Boost fire, sparse short-lived ball speed sparks, skid marks, and synthesized audio.
 - `src/demolition.ts`: Reusable fireballs, expanding shock rings, spark streaks, tumbling tires/body fragments, BOOM lettering, and thin smoke that clears quickly and fades near the camera.
 - `src/goal-explosion.ts`, `src/blast-pass.ts`: Stellar Collapse goal celebration: plasma corona, singularity and accretion disk, 15,000 GPU particles, branching lightning, curved energy jets, ground shockwave, screen refraction, dynamic lighting, and bass/rumble audio. Geometry is reused between goals.
 - `src/ball-marker.ts`: High-contrast, height-scaled ground reticle, projected onto the floor and ramps.
 - `src/controls.ts`, `src/bindings.ts`: Keyboard and polled Gamepad API inputs, analog deadzones, edge-triggered actions, safe hotplug handling, validated persistent bindings.
 - `src/controls-menu.ts`, `src/hud.ts`, `src/style.css`: Rebinding/capture UI, controller status and live monitor, tuning, responsive match UI and active-device hints.
+
+Countdown, kickoff, goals, overtime and event popups use chunky gradient lettering with black outlines and offset black shadows, matching the demolition art. Announcements animate with a short pop; reduced-motion preferences suppress that entrance.
 
 Goal interiors use 2.56-unit floor fillets, tapering flush at the mouth, with wider rounded back corners. All curved goal surfaces share transparent honeycomb; their collision shapes remain fully driveable. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
 

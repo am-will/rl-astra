@@ -209,7 +209,7 @@ export class Stadium {
     const base = new T.Mesh(new T.CylinderGeometry(2.2, 5.5, 16, 5), stone); base.position.y = 10; monument.add(base);
     const plinth = new T.Mesh(new T.CylinderGeometry(3, 2.1, 1.3, 10), silver); plinth.position.y = 18.5; monument.add(plinth);
     const ball = detailedBall(ballSource); ball.scale.setScalar(3.5); ball.position.set(-1, 22, 0); monument.add(ball);
-    const car = detailedCar(carSource, 'blue', []).root; car.scale.setScalar(6); car.position.set(1, 25.5, 0); car.rotation.set(0, -Math.PI / 2, -.35); monument.add(car);
+    const car = detailedCar(carSource, 'blue').root; car.scale.setScalar(6); car.position.set(1, 25.5, 0); car.rotation.set(0, -Math.PI / 2, -.35); monument.add(car);
     car.traverse(o => { if (o instanceof T.Mesh) { o.material = silver; o.castShadow = false; } });
     for (const sign of [-1, 1]) {
       const points = Array.from({ length: 32 }, (_, i) => { const a = i / 31 * Math.PI * 1.6; return new T.Vector3(Math.cos(a) * 5.3, 20 + i / 31 * 9, Math.sin(a) * 4.2 * sign); });

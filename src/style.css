@@ -21,3 +21,28 @@
 @media(max-width:480px){.bindings-header p{font-size:10px}.bindings-close{padding:11px}.bindings-close span{display:none}.controller-status{padding:10px}.binding-tabs{gap:16px}.binding-tabs button{font-size:9px}.binding-columns{display:none}.binding-row{grid-template-columns:1fr 1fr;gap:8px;padding:13px 0}.binding-name{grid-column:1/-1}.mobile-device{display:block;width:100%;font-size:7px;letter-spacing:1px;color:#688ea9;margin:2px 0}.tuning-title{align-items:start;flex-direction:column;gap:7px}}
 @media(max-height:640px){.bindings-header{padding-top:15px;padding-bottom:12px}.bindings-header h2{font-size:32px}.controller-status{padding:8px 12px}.bindings-footer{padding-top:10px}.input-monitor{min-height:43px;padding-top:5px;padding-bottom:5px}.binding-tabs{margin-top:6px}.binding-tabs button{padding:10px 0}}
 @media(prefers-reduced-motion:reduce){.capture-pulse span{animation:none}}
+
+/* Match announcements share the demolition lettering: warm ink, black keyline,
+   and a deep offset outline. The scoreboard and controls retain their compact type. */
+.center-message{max-width:calc(100% - 42px);text-shadow:none}
+.center-message h1,.event-toast{position:relative;isolation:isolate;font-family:'Arial Black',Barlow,sans-serif;font-weight:900;font-style:italic;letter-spacing:.015em;background:none;color:transparent;text-shadow:none;transform:rotate(-3deg);paint-order:stroke fill}
+.center-message h1::before,.center-message h1::after,.event-toast::before,.event-toast::after{content:attr(data-text);position:absolute;inset:0;pointer-events:none;white-space:inherit;background:none;paint-order:stroke fill}
+.center-message h1::before,.event-toast::before{z-index:-2;color:#000;-webkit-text-stroke:.09em #000;transform:translate(.015em,.065em)}
+.center-message h1::after,.event-toast::after{z-index:-1;color:#000;-webkit-text-stroke:.035em #000}
+.center-message h1{font-size:clamp(38px,6.4vw,92px);line-height:1.08;margin:12px 0 22px}
+.center-message>span{font-size:clamp(9px,1vw,13px);font-weight:800;color:#ffe5b1;letter-spacing:3px;text-shadow:0 2px 2px #17151e,0 0 8px #17151e}
+.center-message p{font-size:clamp(10px,1.1vw,15px);color:#fff0d1;text-shadow:0 2px 3px #121822;letter-spacing:1.5px}
+.center-message.countdown h1{font-size:clamp(110px,15vw,180px);color:transparent}
+.center-message.goal h1{font-size:clamp(34px,6.8vw,100px);color:transparent;text-shadow:none}
+.center-message.goal{top:18%}
+.event-toast{position:absolute;z-index:3;top:13%;font-size:clamp(15px,2vw,25px);letter-spacing:.04em;transform:translate(-50%,-8px) rotate(-3deg);white-space:nowrap}
+.event-toast.visible{transform:translate(-50%,0) rotate(-3deg)}
+@media(max-width:650px){.center-message h1{font-size:clamp(31px,7.5vw,48px)}.center-message.countdown h1{font-size:120px}.center-message.goal h1{font-size:clamp(29px,7.5vw,48px)}.event-toast{top:16%;font-size:16px}.center-message>span{letter-spacing:2px}}
+@media(max-height:600px){.center-message h1{font-size:44px}.center-message.countdown h1{font-size:100px}.center-message.goal h1{font-size:48px}.event-toast{top:23%;font-size:17px}.center-message.goal{top:30%}}
+.center-message h1 .comic-face,.event-toast .comic-face{position:relative;z-index:1;display:block;background:linear-gradient(#fffce8 8%,#ffdb80 46%,#ef7032 98%);background-clip:text;-webkit-background-clip:text;color:transparent}
+
+.event-toast{width:max-content;max-width:calc(100% - 40px);white-space:normal;text-align:center;line-height:1.4}
+
+.center-message.countdown h1:is([data-text="1"],[data-text="2"],[data-text="3"]){font-size:clamp(120px,16.5vw,198px)}
+@media(max-width:650px){.center-message.countdown h1:is([data-text="1"],[data-text="2"],[data-text="3"]){font-size:132px}}
+@media(max-height:600px){.center-message.countdown h1:is([data-text="1"],[data-text="2"],[data-text="3"]){font-size:110px}}
