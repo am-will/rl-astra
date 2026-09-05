@@ -8,17 +8,13 @@ export class BallDirection {
 
   constructor(scene: T.Scene) {
     this.root.name = 'ball-direction-pointer'; this.root.visible = false;
-    const shape = new T.Shape();
-    shape.moveTo(0, -.29); shape.lineTo(.18, -.03); shape.lineTo(.075, -.055);
-    shape.lineTo(.075, .22); shape.lineTo(-.075, .22); shape.lineTo(-.075, -.055);
-    shape.lineTo(-.18, -.03); shape.closePath();
-    const geometry = new T.ExtrudeGeometry(shape, { depth: .055, bevelEnabled: true, bevelSize: .014, bevelThickness: .012, bevelSegments: 1, steps: 1, curveSegments: 1 });
-    // Map the shape's tip to local -Z, with the bevel raised above the field.
-    geometry.rotateX(Math.PI / 2); geometry.translate(0, .055, 0); geometry.scale(.68, .68, .68);
     const face = new T.MeshStandardMaterial({ color: 0xc9d1d2, metalness: .3, roughness: .44, envMapIntensity: .3, emissive: 0x9aafb6, emissiveIntensity: .08 });
-    const edge = new T.MeshStandardMaterial({ color: 0x566a73, metalness: .5, roughness: .5, envMapIntensity: .3 });
-    const pointer = new T.Mesh(geometry, [face, edge]);
-    pointer.name = 'silver-ball-arrow'; this.root.add(pointer); scene.add(this.root);
+    // About 40% of the previous marker's length, with a round shaft and tip.
+    const shaft = new T.Mesh(new T.CylinderGeometry(.0125, .0125, .095, 10), face);
+    shaft.rotation.x = -Math.PI / 2; shaft.position.z = .018; shaft.name = 'ball-arrow-shaft';
+    const tip = new T.Mesh(new T.ConeGeometry(.03, .051, 10), face);
+    tip.rotation.x = -Math.PI / 2; tip.position.z = -.051; tip.name = 'ball-arrow-tip';
+    this.root.add(shaft, tip); scene.add(this.root);
   }
 
   update(car: T.Vector3, ball: T.Vector3, enabled: boolean) {

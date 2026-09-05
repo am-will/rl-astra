@@ -17,6 +17,7 @@ import { RocketBoost } from './rocket-boost';
 import { SpeedTrails } from './speed-trails';
 import { FlameSmoke } from './flame-smoke';
 import { BallDirection } from './ball-direction';
+import { TurfDebris } from './turf-debris';
 
 export type QualityLevel = 'performance' | 'high' | 'ultra';
 export type BoostStyle = 'classic' | 'inferno';
@@ -38,6 +39,7 @@ export class GameRenderer {
   infernos: [FlameSmoke, FlameSmoke];
   boostStyle: BoostStyle = 'classic';
   speedTrails: [SpeedTrails, SpeedTrails];
+  turfDebris: [TurfDebris, TurfDebris];
   audio = new GameAudio();
   ballCam = true;
   shake = 0;
@@ -99,6 +101,8 @@ export class GameRenderer {
     this.infernos = [new FlameSmoke(this.scene), new FlameSmoke(this.scene)];
     this.speedTrails = [new SpeedTrails(this.scene), new SpeedTrails(this.scene, true)];
     this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
+    this.turfDebris = [new TurfDebris(this.scene), new TurfDebris(this.scene)];
+    this.turfDebris[0].configureWheels(this.player); this.turfDebris[1].configureWheels(this.bot);
     this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
     this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
@@ -117,6 +121,7 @@ export class GameRenderer {
     this.scene.children.filter(o => o.name === 'contact-shadow').forEach(o => { const index = old.indexOf(o.userData.owner); if (index >= 0) o.userData.owner = replacement[index]; });
     this.stadium.addMonument(source.car, source.ball);
     this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
+    this.turfDebris[0].configureWheels(this.player); this.turfDebris[1].configureWheels(this.bot);
     old.forEach(root => root.traverse(o => { if (o instanceof T.Mesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } }));
     this.update(0, 'ready');
   }
@@ -156,12 +161,7 @@ export class GameRenderer {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
       this.effects.emit(new T.Vector3(Math.random() < .5 ? -.255 : .255, .025, 1.6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
     }
-    if (car.drifting && car.grounded && car.speed > 4 && dt > 0 && model.root.position.y < .65) {
-      for (const x of [-.43, .43]) {
-        const point = new T.Vector3(x, -.32, .46).applyQuaternion(model.root.quaternion).add(model.root.position);
-        this.effects.skid(point, (model === this.player ? 0 : 2) + (x > 0 ? 1 : 0)); this.effects.puff(point, new T.Vector3(0, .3, 0), .2, .55);
-      }
-    }
+    this.turfDebris[index].update(model, car, this.physics.pads, dt, model.root.visible && (index === 0 || this.physics.botEnabled));
   }
   update(dt: number, phase: string, celebration?: T.Vector3, alpha = 1) {
     this.time += dt;

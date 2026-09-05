@@ -9,9 +9,6 @@ export class Effects {
   max = 1300;
   points: T.Points;
   smokePoints: T.Points;
-  skidMarks: T.InstancedMesh;
-  skidIndex = 0;
-  lastSkids = new Map<number, { pos: T.Vector3; time: number }>();
   explosion: GoalExplosion;
   demolitions: Demolitions;
   private ballEmission = 0;
@@ -27,22 +24,10 @@ export class Effects {
     const smokeMat = new T.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { map: { value: glowTexture() }, screenHeight: { value: innerHeight } }, vertexShader: `attribute float alpha; attribute float size; varying float vAlpha; uniform float screenHeight; void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vAlpha=alpha*step(.2,-mv.z);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(size*screenHeight/max(.2,-mv.z),1.,96.);}`, fragmentShader: `uniform sampler2D map; varying float vAlpha; void main(){float a=texture2D(map,gl_PointCoord).a;gl_FragColor=vec4(.65,.73,.79,a*vAlpha);}` });
     this.smokePoints = new T.Points(smokeGeo, smokeMat); this.smokePoints.frustumCulled = false; scene.add(this.smokePoints);
     window.addEventListener('resize', () => { smokeMat.uniforms.screenHeight.value = innerHeight; });
-    const skidCanvas = document.createElement('canvas'); skidCanvas.width = 64; skidCanvas.height = 8;
-    const c = skidCanvas.getContext('2d')!, gradient = c.createLinearGradient(0, 0, 64, 0); gradient.addColorStop(0, 'rgba(255,255,255,0)'); gradient.addColorStop(.25, 'white'); gradient.addColorStop(.75, 'white'); gradient.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gradient; c.fillRect(0, 0, 64, 8);
-    this.skidMarks = new T.InstancedMesh(new T.PlaneGeometry(.11, 1), new T.MeshBasicMaterial({ map: new T.CanvasTexture(skidCanvas), color: 0x0b1a11, transparent: true, opacity: .25, depthWrite: false }), 900);
-    this.skidMarks.count = 0; this.skidMarks.frustumCulled = false; scene.add(this.skidMarks);
   }
   puff(pos: T.Vector3, velocity: T.Vector3, size = 1, lifetime = .75) {
     if (this.smoke.length >= 450) return;
     this.smoke.push({ pos: pos.clone(), velocity: velocity.clone().add(new T.Vector3((Math.random() - .5) * .8, .4, (Math.random() - .5) * .8)), color: new T.Color(), life: lifetime, maxLife: lifetime, size });
-  }
-  skid(pos: T.Vector3, key: number) {
-    const previous = this.lastSkids.get(key), now = performance.now(); this.lastSkids.set(key, { pos: pos.clone(), time: now });
-    if (!previous || now - previous.time > 150) return;
-    const delta = pos.clone().sub(previous.pos), length = delta.length(); if (length < .015 || length > .9) return;
-    const dummy = new T.Object3D(); dummy.position.copy(pos).add(previous.pos).multiplyScalar(.5); dummy.position.y = .013;
-    dummy.quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.atan2(-delta.x, -delta.z)).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), -Math.PI / 2)); dummy.scale.y = length + .025; dummy.updateMatrix();
-    this.skidMarks.setMatrixAt(this.skidIndex++ % 900, dummy.matrix); this.skidMarks.count = Math.min(900, this.skidIndex); this.skidMarks.instanceMatrix.needsUpdate = true;
   }
   emit(pos: T.Vector3, velocity: T.Vector3, color: T.ColorRepresentation, life = .6, spread = .5) {
     if (this.particles.length >= this.max) return;

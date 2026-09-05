@@ -44,8 +44,8 @@ export class FollowCamera {
     const probe = (yaw: number) => pos.clone().add(new Vector3(Math.sin(yaw) * baseDistance, this.settings.height, Math.cos(yaw) * baseDistance));
     const directClearance = clear(pos, probe(desiredYaw));
     if (directClearance < baseDistance * .95) {
-      // Begin orbiting before a solid ramp reaches the camera. Choose the
-      // nearest clear arc, retaining the current side when both are possible.
+      // Only solid ground can obstruct the lens. Arena walls and ramps allow
+      // the intended orbit to continue outside their transparent back faces.
       const preferredSide = shortest(this.yaw - desiredYaw) < 0 ? -1 : 1;
       let safeYaw = desiredYaw, bestClearance = directClearance;
       search: for (let angle = Math.PI / 12; angle <= Math.PI * .75; angle += Math.PI / 12) for (const sign of [preferredSide, -preferredSide]) {
@@ -84,10 +84,8 @@ export class FollowCamera {
     else [this.distance, this.distanceVelocity] = spring(this.distance, this.distanceVelocity, desiredDistance, 10 * response, dt);
     let desired = pos.clone().addScaledVector(this.forward, -this.distance).addScaledVector(UP, height);
     desired.y = MathUtils.clamp(desired.y, .7, FIELD.height - .4);
-    // Sweep from the car through opaque floor and ramp collision meshes.
-    // The transparent wall/ceiling cage must not pin the lens against a car. This
-    // replaces the discontinuous wall-side and height switches with continuous
-    // shortening, and releases the camera smoothly after an obstruction.
+    // Keep the lens above solid ground. Walls, ramps and the ceiling cage
+    // never shorten this distance or force a different orbit.
     const offset = desired.clone().sub(pos), length = offset.length();
     const limit = clear(pos, desired);
     if (reset || limit < this.clearance) this.clearance = limit;

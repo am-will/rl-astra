@@ -63,3 +63,14 @@
 @media(prefers-reduced-motion:reduce){.boost-hud *{animation:none!important;transition:none!important}.boost-flow{display:none}}
 
 @media(max-width:650px){.practice-label{font-size:20px}}
+
+/* The red corner cue appears only while the camera is locked to the ball. */
+.ball-cam-active .camera-button,.ball-cam-active .camera-hint{display:none}
+.ball-cam-corner{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;border:0;background:none;padding:0;color:#f9eee9;text-align:left;isolation:isolate}
+.ball-cam-corner:before{content:'';position:absolute;z-index:-1;inset:-25px -16px -14px -23px;background:radial-gradient(ellipse at 25% 42%,#f24b403d,transparent 66%);pointer-events:none}
+.ball-cam-title{display:flex;align-items:center;gap:8px;font:400 18px/1.2 'Avenir Next','Segoe UI',sans-serif;letter-spacing:.35px;color:#ff8c72;text-shadow:0 0 6px #f65737,0 0 17px #ea483d8c}
+.ball-cam-title i{width:7px;height:7px;border-radius:50%;background:#ffb394;box-shadow:0 0 5px #ff725c,0 0 13px #ff4c42}
+.ball-cam-corner small{display:flex;align-items:center;gap:4px;padding-left:15px;font:400 8px/1.2 'Avenir Next','Segoe UI',sans-serif;text-shadow:0 1px 2px #000;letter-spacing:.25px}
+.ball-cam-corner kbd{min-width:13px;height:13px;padding:0 2px;font-size:9px;border:1px solid #d9e4e699;border-radius:2px;background:#07192166;letter-spacing:0}
+.ball-cam-corner kbd.is-playstation{color:#a2d6ba;border-color:#a2d6ba;border-radius:50%;font-size:11px;line-height:1;padding:0;width:13px}
+@media(max-width:650px){.ball-cam-title{font-size:16px}.ball-cam-corner small{font-size:7px}}

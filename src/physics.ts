@@ -59,11 +59,12 @@ export class Physics {
   buildArena() {
     const { width: w, length: l, goalDepth: d } = FIELD;
     this.box(0, -1, 0, w * 2 + 4, 2, (l + d) * 2 + 4);
-    for (const { geometry, kind } of arenaSurfaces()) {
+    for (const { geometry } of arenaSurfaces()) {
       const vertices = new Float32Array(geometry.getAttribute('position').array);
       const indices = new Uint32Array(geometry.index!.array);
-      const collider = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setFriction(.475).setRestitution(.62));
-      if (kind === 'ramp') this.cameraSolids.add(collider.handle);
+      // Ramps collide with cars and the ball, but let the lens pass through
+      // their transparent backs just like the surrounding arena cage.
+      this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setFriction(.475).setRestitution(.62));
       geometry.dispose();
     }
   }

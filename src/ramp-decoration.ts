@@ -67,7 +67,7 @@ function tileTexture(orange: boolean, relief = false) {
 
 export function rampMaterial() {
   const blue = tileTexture(false), orange = tileTexture(true);
-  const mat = new T.MeshStandardMaterial({ name: 'glazed-arena-tiles', map: blue, bumpMap: tileTexture(false, true), bumpScale: .013, metalness: .04, roughness: .64, envMapIntensity: .25, side: T.DoubleSide });
+  const mat = new T.MeshStandardMaterial({ name: 'glazed-arena-tiles', map: blue, bumpMap: tileTexture(false, true), bumpScale: .013, metalness: .04, roughness: .64, envMapIntensity: .25, side: T.FrontSide });
   mat.onBeforeCompile = shader => {
     shader.uniforms.orangeTiles = { value: orange };
     shader.vertexShader = 'varying float rampWorldZ;\n' + shader.vertexShader;

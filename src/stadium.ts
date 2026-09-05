@@ -94,7 +94,10 @@ function fadeNearCamera(mesh: T.Mesh) {
     }
     cameraFadeMaterials.set(solid, blended);
   }
-  const overlay = new T.Mesh(mesh.geometry, blended);
+  const overlay = mesh instanceof T.InstancedMesh ? new T.InstancedMesh(mesh.geometry, blended, mesh.count) : new T.Mesh(mesh.geometry, blended);
+  if (overlay instanceof T.InstancedMesh && mesh instanceof T.InstancedMesh) {
+    overlay.instanceMatrix = mesh.instanceMatrix; overlay.instanceColor = mesh.instanceColor;
+  }
   overlay.name = 'camera-fade-overlay'; overlay.userData.cameraFadeOverlay = true;
   overlay.receiveShadow = mesh.receiveShadow; overlay.renderOrder = 2;
   mesh.add(overlay);
@@ -129,15 +132,19 @@ export class Stadium {
     const glass = honeycombMaterial(.045);
     this.wallMaterial = glass;
     const { goalWidth: g, width: w, length: l, goalDepth: d } = FIELD;
-    // The camera already sweeps against the floor and ramps. Keep these driving
-    // surfaces solid even when the lens is low or looking down a wall.
+    // Tiles are solid from the field; the reverse face is a faint cage so a
+    // camera outside the arena can still frame both the car and the ball.
     const rampMat = rampMaterial();
+    const rampBack = honeycombMaterial(.07); rampBack.side = T.BackSide;
     const netMats = [honeycombMaterial(.065, 1), honeycombMaterial(.065, -1)];
     for (const surface of arenaSurfaces()) {
       const goalIndex = surface.team > 0 ? 0 : 1;
       const mat = surface.kind === 'ramp' ? rampMat : surface.kind.startsWith('goal-') ? netMats[goalIndex] : glass;
       const mesh = new T.Mesh(surface.geometry, mat); mesh.name = `arena-${surface.kind}`; mesh.receiveShadow = surface.kind === 'ramp'; scene.add(mesh);
-      if (surface.kind === 'ramp') decorateRamp(scene, surface.geometry);
+      if (surface.kind === 'ramp') {
+        decorateRamp(scene, surface.geometry);
+        const back = new T.Mesh(surface.geometry, rampBack); back.name = 'arena-ramp-transparent-back'; scene.add(back);
+      }
     }
     // Continuous light rails follow the actual boundary, including corner curves.
     for (const side of [-1, 1]) for (const level of [2.65, 8.7, FIELD.height - FIELD.rampRadius]) {
@@ -227,7 +234,7 @@ export class Stadium {
       }
       dummy.position.set(side < 2 ? (side ? -1 : 1) * (43 + row * 1.45) : along, 3.8 + row * .87, side < 2 ? along : (side === 2 ? 1 : -1) * (56 + row * 1.5));
       dummy.scale.set(.9 + rand(), 1.2 + rand() * .7, .9 + rand()); dummy.updateMatrix(); crowd.setMatrixAt(i, dummy.matrix); crowd.setColorAt(i, new T.Color(colors[Math.floor(rand() * colors.length)]));
-    } scene.add(crowd);
+    } scene.add(crowd); fadeNearCamera(crowd);
     const stars = new Float32Array(600 * 3);
     for (let i = 0; i < 600; i++) { stars[i * 3] = (rand() - .5) * 600; stars[i * 3 + 1] = 50 + rand() * 200; stars[i * 3 + 2] = (rand() - .5) * 600; }
     scene.add(new T.Points(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(stars, 3)), new T.PointsMaterial({ color: 0xb0cef8, size: .22, transparent: true, opacity: .8 })));

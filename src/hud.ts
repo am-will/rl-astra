@@ -28,7 +28,7 @@ export class HUD {
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
       <div id="goal-flash"></div>
       <div id="bot-name" class="player-label orange">MAVERICK <span>▾</span></div>
-      <div class="bottom-left"><div class="player-card"><span class="player-avatar">01</span><div><strong>YOU<span class="team-tag">BLUE</span></strong><span id="player-status">OCTANE · READY TO PLAY</span></div></div><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
+      <div class="bottom-left"><div class="player-card"><span class="player-avatar">01</span><div><strong>YOU<span class="team-tag">BLUE</span></strong><span id="player-status">OCTANE · READY TO PLAY</span></div></div><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><button class="ball-cam-corner" data-action="camera" aria-label="Toggle ball camera" hidden><span class="ball-cam-title"><i></i>BALL CAM</span><small>PRESS <kbd id="ball-cam-key" data-hint="camera">C</kbd> TO TOGGLE</small></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
       <div class="controls-strip"><div><kbd data-hint="forward">W</kbd><span>DRIVE</span></div><div><kbd data-hint="jump">SPACE</kbd><span>JUMP / FLIP</span></div><div><kbd data-hint="boost">SHIFT</kbd><span>BOOST</span></div><div><kbd data-hint="unlimited">B</kbd><span id="infinite-label">UNLIMITED</span></div><button data-action="help" aria-label="Show all controls">${icon('help')}</button></div>
       <div class="boost-hud"></div>
       <div class="session-footer"><span>CHAMPIONS FIELD</span><span>EXHIBITION</span><span id="fps">60 FPS</span></div>
@@ -41,6 +41,8 @@ export class HUD {
   }
   bindings(controls: Controls) {
     for (const el of Array.from(this.root.querySelectorAll<HTMLElement>('[data-hint]'))) el.textContent = controls.label(el.dataset.hint as ActionId).split(' / ')[0];
+    const cameraKey = this.el('ball-cam-key'), triangle = cameraKey.textContent === 'Triangle';
+    cameraKey.classList.toggle('is-playstation', triangle); if (triangle) cameraKey.textContent = '△';
     for (const id of ['pause', 'sound', 'fullscreen'] as const) this.root.querySelector<HTMLElement>(`.top-actions [data-action="${id}"]`)!.title = `${id.toUpperCase()} (${controls.label(id)})`;
     const rows: [string, ActionId[]][] = [
       ['Drive / steer', ['forward', 'reverse', 'left', 'right']], ['Jump · hold for height / recover', ['jump']],
@@ -105,7 +107,11 @@ export class HUD {
     this.el('infinite-label').classList.toggle('active', data.unlimited);
     if (performance.now() > this.messageUntil) this.el('event-toast').classList.remove('visible');
   }
-  camera(active: boolean) { this.set('camera-status', active ? 'ON' : 'OFF'); this.el('camera-indicator').classList.toggle('active', active); }
+  camera(active: boolean) {
+    this.set('camera-status', active ? 'ON' : 'OFF'); this.el('camera-indicator').classList.toggle('active', active);
+    this.root.querySelector<HTMLElement>('.ball-cam-corner')!.hidden = !active;
+    this.root.querySelector('.bottom-left')!.classList.toggle('ball-cam-active', active);
+  }
   mode(bot: boolean) {
     this.root.querySelector('.scoreboard')!.classList.toggle('is-practice', !bot);
     this.el('timer').hidden = !bot;

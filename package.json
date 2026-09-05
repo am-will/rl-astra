@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs && node tests/fidelity.mjs && node tests/camera-fade.mjs && node tests/steering-boost.mjs && node tests/arena-polish.mjs",
+    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs && node tests/fidelity.mjs && node tests/camera-fade.mjs && node tests/steering-boost.mjs && node tests/arena-polish.mjs && node tests/camera-turf.mjs",
     "test:goals": "node tests/goals.mjs",
     "test:hud": "node tests/hud.mjs",
     "test:speed": "node tests/speed.mjs",
@@ -23,7 +23,8 @@
     "test:fidelity": "node tests/fidelity.mjs",
     "test:camera-fade": "node tests/camera-fade.mjs",
     "test:steering-boost": "node tests/steering-boost.mjs",
-    "test:arena-polish": "node tests/arena-polish.mjs"
+    "test:arena-polish": "node tests/arena-polish.mjs",
+    "test:camera-turf": "node tests/camera-turf.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
