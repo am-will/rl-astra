@@ -216,10 +216,13 @@ export class Physics {
       body.setAngvel(normal.clone().multiplyScalar(turn), true);
       const grip = input.drift ? 1.65 : 9.5;
       const normalSpeed = velocity.dot(normal), tangent = velocity.clone().addScaledVector(normal, -normalSpeed), rollingSpeed = tangent.length();
+      // Keep momentum through ordinary turns, but fade that assistance once
+      // sideways travel dominates. Restoring speed during a broadside slide
+      // cancels tire friction, even with no throttle or with the e-brake held.
+      const rollingAlignment = rollingSpeed > 0 ? Math.abs(tangent.dot(heading)) / rollingSpeed : 0;
+      const momentumRetention = (input.drift ? .97 : .88) * MathUtils.smoothstep(rollingAlignment, 0, Math.SQRT1_2);
       tangent.addScaledVector(sideways, -tangent.dot(sideways) * Math.min(1, grip * dt));
-      // Tire grip mostly redirects rolling momentum. A small scrub loss
-      // remains, while powersliding retains more of an angled landing.
-      if (tangent.lengthSq() > .001) tangent.setLength(MathUtils.lerp(tangent.length(), rollingSpeed, input.drift ? .97 : .88));
+      if (tangent.lengthSq() > .001) tangent.setLength(MathUtils.lerp(tangent.length(), rollingSpeed, momentumRetention));
       velocity.copy(tangent).addScaledVector(normal, normalSpeed);
       if (throttle) {
         const braking = signedSpeed * throttle < -.5, speed = Math.abs(signedSpeed);
@@ -275,17 +278,18 @@ export class Physics {
     }
     if (car.jumpTime > 0) { if (input.jumpHeld) velocity.addScaledVector(up, CAR.jumpHoldAcceleration * dt); car.jumpTime -= dt; }
     if (car.flipTime > 0) {
-      if (input.pitch * car.flipAxis.x < -.3 && car.flipTime < .45) {
-        car.flipTime = 0; car.pitchLock = 0; body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      } else {
-        // A bounded rotation prevents residual angular velocity adding a second
-        // fraction of a flip. Translational momentum and collision remain live.
-        car.flipTime = Math.max(0, car.flipTime - dt);
-        const progress = 1 - car.flipTime / .65;
-        const rotation = car.flipRotation.clone().multiply(new Quaternion().setFromAxisAngle(car.flipAxis, progress * Math.PI * 2));
-        body.setRotation(rotation, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        if (car.flipTime < 1e-7) { car.flipTime = 0; car.pitchLock = .3; body.setRotation(car.flipRotation, true); }
-      }
+      // Counter-pitch only attenuates pitch while held. Ending the entire
+      // dodge on one opposite input could freeze it upside down and also
+      // incorrectly cancel the roll component of diagonal tackles.
+      const axis = car.flipAxis.clone();
+      if (input.pitch * axis.x < 0 && car.flipTime < .45) axis.x *= 1 - Math.min(1, Math.abs(input.pitch));
+      const rotationSpeed = axis.length(), flipDt = Math.min(dt, car.flipTime);
+      if (rotationSpeed > 0) car.flipRotation.multiply(new Quaternion().setFromAxisAngle(axis.divideScalar(rotationSpeed), rotationSpeed * flipDt / .65 * Math.PI * 2)).normalize();
+      car.flipTime = Math.max(0, car.flipTime - dt);
+      // Integrate only the bounded dodge rotation, so releasing counter-pitch
+      // resumes from this pose without snapping or leaving residual spin.
+      body.setRotation(car.flipRotation, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      if (car.flipTime < 1e-7) { car.flipTime = 0; car.pitchLock = .3; }
     }
     if (car.recoveryTime > 0) {
       car.recoveryTime = Math.max(0, car.recoveryTime - dt);

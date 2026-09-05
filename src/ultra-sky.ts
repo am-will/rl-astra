@@ -15,7 +15,7 @@ export function createUltraSky() {
         vec3 sky=mix(vec3(.48,.26,.13),vec3(.035,.13,.3),smoothstep(0.,.6,h));
         sky+=vec3(1.,.48,.15)*pow(alignment,8.)*.23;
         sky+=vec3(5.,3.8,2.3)*smoothstep(.9992,.9997,alignment);
-        vec2 p=d.xz/(h+.28)*2.6+vec2(skyTime*.004,skyTime*.0015);
+        vec2 p=d.xz/(h+.28)*2.6+vec2(skyTime*.012,skyTime*.0045);
         float density=clouds(p),coverage=smoothstep(.43,.65,density)*smoothstep(.015,.16,h);
         float rim=clamp((density-clouds(p+sunDirection.xz*.13))*8.+.5,0.,1.);
         vec3 cloudColor=mix(vec3(.11,.16,.23),vec3(.72,.55,.39),rim);

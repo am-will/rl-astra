@@ -42,7 +42,7 @@ function shieldTexture() {
   const texture = new T.CanvasTexture(canvas); texture.colorSpace = T.SRGBColorSpace; return texture;
 }
 
-export function createGoalFrame(team: number) {
+export function createGoalFrame(team: number, animatedChannels?: T.Material) {
   const root = new T.Group(); root.name = team > 0 ? 'blue-goal-frame' : 'orange-goal-frame';
   root.position.z = team * FIELD.length; root.scale.z = team;
   const body = new T.Group(); root.add(body);
@@ -62,7 +62,7 @@ export function createGoalFrame(team: number) {
   floor.geometry.computeVertexNormals(); floor.receiveShadow = true; root.add(floor);
   const graphite = material(0x101923, .72, .37), gunmetal = material(0x354553, .8, .33), alloy = material(0x8c9aa1, .7, .4);
   for (const mat of [graphite, gunmetal, alloy]) mat.side = T.DoubleSide;
-  const light = new T.MeshBasicMaterial({ color: team > 0 ? 0x087cff : 0xff790b, side: T.DoubleSide, toneMapped: false });
+  const light = animatedChannels ?? new T.MeshBasicMaterial({ color: team > 0 ? 0x087cff : 0xff790b, side: T.DoubleSide, toneMapped: false });
   const pinstripe = new T.MeshBasicMaterial({ color: team > 0 ? 0x83bdff : 0xffbf77, side: T.DoubleSide, toneMapped: false });
   const ribbon = (a: T.Vector3[], b: T.Vector3[], mat: T.Material) => body.add(new T.Mesh(strip(a, b), mat));
   const rail = (points: T.Vector3[], radius: number, mat: T.Material) => body.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points), 192, radius, 6, false), mat));

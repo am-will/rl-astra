@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { BOOST_OUTLET } from './octane-outlets';
 
 /** Classic orange afterburner: white-hot core, rippling flame sheath and tapered tips. */
 export class RocketBoost {
@@ -20,10 +21,12 @@ export class RocketBoost {
       void main(){float t=position.z;vT=t;vUv=uv;
         float pulse=sin(t*28.-time*43.+uv.x*12.566)*.07+sin(t*43.-time*71.)*.025;
         float radius=(.072+.22*sin(t*2.85))*pow(max(.001,1.-t),.65)*(1.+pulse*t);
-        radius*=mix(1.,.46,core);
-        vec3 p=vec3(position.xy*radius,t*length*mix(1.,.77,core)*strength);
+        // Start at the tall slot, then round out as the two jets expand rearward.
+        vec2 opening=mix(vec2(${BOOST_OUTLET.width * .5},${BOOST_OUTLET.height * .5}),vec2(radius),smoothstep(0.,.28,t));
+        opening*=mix(1.,.56,core);
+        vec3 p=vec3(position.xy*opening,t*length*mix(1.,.77,core)*strength);
         p.xy+=drift*t*t*.05+vec2(sin(t*8.-time*17.),cos(t*11.-time*21.))*t*t*.032;
-        vec4 eye=modelViewMatrix*vec4(p,1.);vEye=-eye.xyz;vNormal=normalMatrix*normal;
+        vec4 eye=modelViewMatrix*vec4(p,1.);vEye=-eye.xyz;vNormal=normalMatrix*vec3(normal.x*opening.y,normal.y*opening.x,normal.z);
         gl_Position=projectionMatrix*eye;
       }`;
     const fragmentShader = `uniform float time,strength,core;varying vec2 vUv;varying float vT;varying vec3 vEye;varying vec3 vNormal;
@@ -40,12 +43,12 @@ export class RocketBoost {
         float alpha=body*mix(.57,.82,core)*smoothstep(.03,.55,edge)*strength*smoothstep(.2,.8,vEye.z);
         gl_FragColor=vec4(color,alpha);
       }`;
-    for (const x of [-.255, .255]) for (const core of [0, 1]) {
+    for (const side of [-1, 1]) for (const core of [0, 1]) {
       const uniforms = { ...this.uniforms, core: { value: core } };
       const material = new T.ShaderMaterial({ uniforms, vertexShader, fragmentShader,
         transparent: true, depthWrite: false, side: T.DoubleSide,
         blending: core ? T.AdditiveBlending : T.NormalBlending });
-      const flame = new T.Mesh(geometry, material); flame.position.set(x, .025, .65); flame.frustumCulled = false;
+      const flame = new T.Mesh(geometry, material); flame.name = 'pillar-boost-jet'; flame.position.set(side * BOOST_OUTLET.x, BOOST_OUTLET.y, BOOST_OUTLET.z + .003); flame.frustumCulled = false;
       this.root.add(flame);
     }
   }

@@ -17,10 +17,11 @@ function createBoostPadHousing(triangular = false) {
   const root = new T.Group(), housing = new T.Group(), pickup = new T.Group(), emitters = new T.Group();
   housing.name = 'boost-pad-housing'; pickup.name = 'boost-pad-pickup';
   root.add(housing, pickup); pickup.add(emitters);
-  const dark = new T.MeshStandardMaterial({ color: 0x17212b, metalness: .55, roughness: .52 });
-  const silver = new T.MeshStandardMaterial({ color: 0xc1ccd6, metalness: .62, roughness: .36 });
-  const panel = new T.MeshStandardMaterial({ color: 0x485363, metalness: .55, roughness: .45 });
-  const amber = new T.MeshStandardMaterial({ color: 0xffb532, emissive: 0xff9b16, emissiveIntensity: 1.65, transparent: true, depthWrite: false });
+  // Diffuse lighting keeps the pads readable without moving specular/environment glints.
+  const dark = new T.MeshLambertMaterial({ color: 0x17212b, reflectivity: 0 });
+  const silver = new T.MeshLambertMaterial({ color: 0xc1ccd6, reflectivity: 0 });
+  const panel = new T.MeshLambertMaterial({ color: 0x485363, reflectivity: 0 });
+  const amber = new T.MeshLambertMaterial({ color: 0xffb532, reflectivity: 0, emissive: 0xff9b16, emissiveIntensity: 1.65, transparent: true, depthWrite: false });
 
   const outline = (radius: number) => {
     const shape = new T.Shape();

@@ -19,6 +19,7 @@ npm run test:fidelity # Camera preferences, Ultra shaders, boost effects, and re
 npm run test:ultra-fidelity # Wind motion, paint-colored engine cores, contact shading, and quality switching
 npm run test:render-fixes # First-use explosion shaders, stable lights, and brake lamps
 npm run test:turf-contacts # Four tire patches, silhouette halo regression, and visible turf clumps
+npm run test:stadium-presentation # Animated arena, live scoreboards, pause, quality tiers and frame timings
 npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
 npm run test:speed    # Supersonic timing, momentum after ball hits, and wheel trails
 npm run test:hud      # Boost gauge, pickup feedback, scoreboard and compact layouts
@@ -81,6 +82,8 @@ Tire contacts occasionally throw up short-lived pieces of grass and soil, with m
 
 Ultra also adds depth-based ambient occlusion, SMAA edge smoothing, a layered sunset sky, and a tighter, texel-aligned sun shadow around the car and ball. The Octane has sculpted tire tread and recessed, segmented rear engine cores that match each paint preset, pulse and brighten with boost. The round red taillights brighten under braking, reverse input, and moving handbrake use, then dim when released. Grass between the tires remains undisturbed. Ambient occlusion applies above the grass canopy; blade root shading and sun shadows shade the turf without a bright fringe following the car.
 
+The stadium has panoramic LED ribbons above the stands, traveling light pulses along the upper arena and goal frames, woven banners that move in the wind, and waves of cheering spectators. Ramp tops use metal trim and static advertising, with no animated LED strip. Boost-pad surfaces have matte, nonreflective lighting. The two large screens show the actual score, clock, overtime, and practice status, and the arena lighting celebrates the scoring team. Ultra adds sweeping roof searchlights and scattered crowd lights alongside the moving sunset clouds. These animations share the render clock and freeze on pause; scoreboard textures update only when the displayed match state changes.
+
 Goal and demolition graphics are compiled and drawn offscreen before loading finishes. Their lights remain registered at zero intensity while inactive, preventing a scene-wide shader recompile on the first explosion or when both cars are demolished.
 
 The saved **Boost style** selector offers **Classic**, the original focused orange afterburner, and **Inferno**, a multicolored smoke plume with no separate nozzle flame. Inferno particles remain in world space through turns, expire after release, and clear on teleports or style changes. Both styles work in every quality tier.
@@ -96,6 +99,7 @@ Press **P** to toggle untimed solo practice, which starts immediately and skips 
 - `src/follow-camera.ts`: Smooth angular orbit, spring distance, roughly 0.38-second mode transitions, two-subject ball framing, high-ball field of view, and floor clearance. The camera passes through the transparent backs of ramps and arena walls.
 - `src/goal-frame.ts`: Layered beveled goal surrounds, silver U-shaped borders around flat side panels, inset team lamps, hex-tiled sills, and three translucent own-goal shields.
 - `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
+- `src/stadium-presentation.ts`: Live scoreboards, LED ribbons, animated light channels, cloth and crowd motion, goal celebration lighting, and Ultra roof beams.
 - `src/models.ts`: Detailed Octane and ball assets, material setup, and independent wheel pivots.
 - `src/boost-pad.ts`: Low three-lobed silver housings, recessed sockets, and amber inserts. Collected large orbs contract into their sockets over 180 ms; small emitters dim and retract over 120 ms. Small pads use a silver three-lobed plate, recessed amber disk, and six translucent energy curtains. The housing remains visible during cooldown.
 - `src/rocket-boost.ts`: Animated twin orange afterburners with bright cores, rippling edges, lateral drift, and smooth release; no continuous boost smoke cloud.

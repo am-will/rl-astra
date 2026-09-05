@@ -1,7 +1,8 @@
 import * as T from 'three';
+import { BOOST_OUTLET } from './octane-outlets';
 
 const CAPACITY = 160;
-interface Puff { position: T.Vector3; velocity: T.Vector3; age: number; life: number; seed: number; }
+interface Puff { position: T.Vector3; velocity: T.Vector3; up: T.Vector3; age: number; life: number; seed: number; }
 /** World-space billows expand from hot orange gas into soft, drifting smoke. */
 export class FlameSmoke {
   root: T.InstancedMesh;
@@ -9,15 +10,22 @@ export class FlameSmoke {
   private debt = 0;
   private previous = new T.Vector3();
   private data = new T.InstancedBufferAttribute(new Float32Array(CAPACITY * 3), 3);
+  private up = new T.InstancedBufferAttribute(new Float32Array(CAPACITY * 3), 3);
   private matrix = new T.Matrix4();
   private uniforms = { cameraRight: { value: new T.Vector3(1, 0, 0) }, cameraUp: { value: new T.Vector3(0, 1, 0) } };
   constructor(scene: T.Scene) {
-    const geometry = new T.PlaneGeometry(1, 1); geometry.setAttribute('puffData', this.data);
+    const geometry = new T.PlaneGeometry(1, 1); geometry.setAttribute('puffData', this.data); geometry.setAttribute('puffUp', this.up);
     const material = new T.ShaderMaterial({ uniforms: this.uniforms, transparent: true, depthWrite: false,
-      vertexShader: `attribute vec3 puffData;uniform vec3 cameraRight,cameraUp;varying vec2 vUv;varying vec3 vData;
+      vertexShader: `attribute vec3 puffData,puffUp;uniform vec3 cameraRight,cameraUp;varying vec2 vUv;varying vec3 vData;
         void main(){vUv=uv;vData=puffData;vec3 center=instanceMatrix[3].xyz;
           float size=(.16+puffData.x*.95)*puffData.z;
-          vec3 p=center+(cameraRight*position.x+cameraUp*position.y)*size;
+          float spread=smoothstep(0.,.28,puffData.x);
+          vec2 projectedUp=vec2(dot(puffUp,cameraRight),dot(puffUp,cameraUp));
+          float roll=length(projectedUp)>.01?atan(projectedUp.x,projectedUp.y)*(1.-spread):0.;
+          vec3 across=cameraRight*cos(roll)-cameraUp*sin(roll),rise=cameraUp*cos(roll)+cameraRight*sin(roll);
+          vec2 opening=mix(vec2(${BOOST_OUTLET.width},${BOOST_OUTLET.height}),vec2(size),spread);
+          // Each newborn billow follows the slot's orientation, including during air rolls.
+          vec3 p=center+across*position.x*opening.x+rise*position.y*opening.y;
           gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`,
       fragmentShader: `varying vec2 vUv;varying vec3 vData;
         float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -36,7 +44,7 @@ export class FlameSmoke {
           #include <colorspace_fragment>
         }` });
     this.root = new T.InstancedMesh(geometry, material, CAPACITY); this.root.name = 'inferno-flame-smoke'; this.root.frustumCulled = false; this.root.visible = false; this.root.count = 0; this.root.renderOrder = 3; scene.add(this.root);
-    this.root.instanceMatrix.setUsage(T.DynamicDrawUsage); this.data.setUsage(T.DynamicDrawUsage);
+    this.root.instanceMatrix.setUsage(T.DynamicDrawUsage); this.data.setUsage(T.DynamicDrawUsage); this.up.setUsage(T.DynamicDrawUsage);
   }
   reset() { this.particles.length = 0; this.debt = 0; this.root.count = 0; this.root.visible = false; }
   update(position: T.Vector3, rotation: T.Quaternion, velocity: T.Vector3, active: boolean, dt: number, camera: T.Camera) {
@@ -48,19 +56,19 @@ export class FlameSmoke {
       this.particles = this.particles.filter(p => p.age < p.life);
       if (active) {
         this.debt += dt * 95;
-        while (this.debt >= 1) { this.debt--; for (const x of [-.255, .255]) {
+        while (this.debt >= 1) { this.debt--; for (const side of [-1, 1]) {
           if (this.particles.length >= CAPACITY) this.particles.shift();
-          const p = new T.Vector3(x, .025, .71).applyQuaternion(rotation).add(position);
+          const p = new T.Vector3(side * BOOST_OUTLET.x, BOOST_OUTLET.y, BOOST_OUTLET.z + .006).applyQuaternion(rotation).add(position);
           const speed = new T.Vector3((Math.random() - .5) * .8, (Math.random() - .5) * .5, 6.5 + Math.random() * 2).applyQuaternion(rotation).addScaledVector(velocity, .64);
           const age = this.debt / 95; p.addScaledVector(velocity, -age).addScaledVector(speed, age);
-          this.particles.push({ position: p, velocity: speed, age, life: .6 + Math.random() * .22, seed: Math.random() });
+          this.particles.push({ position: p, velocity: speed, up: new T.Vector3(0, 1, 0).applyQuaternion(rotation), age, life: .6 + Math.random() * .22, seed: Math.random() });
         } }
       } else this.debt = 0;
     }
     // Back-to-front blending stays correct as the camera orbits the trail.
     const forward = new T.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     this.particles.sort((a, b) => b.position.dot(forward) - a.position.dot(forward));
-    this.particles.forEach((p, i) => { this.matrix.makeTranslation(p.position.x, p.position.y, p.position.z); this.root.setMatrixAt(i, this.matrix); this.data.setXYZ(i, p.age / p.life, p.seed, .82 + p.seed * .48); });
-    this.root.count = this.particles.length; this.root.visible = this.root.count > 0; this.root.instanceMatrix.needsUpdate = true; this.data.needsUpdate = true;
+    this.particles.forEach((p, i) => { this.matrix.makeTranslation(p.position.x, p.position.y, p.position.z); this.root.setMatrixAt(i, this.matrix); this.data.setXYZ(i, p.age / p.life, p.seed, .82 + p.seed * .48); this.up.setXYZ(i, p.up.x, p.up.y, p.up.z); });
+    this.root.count = this.particles.length; this.root.visible = this.root.count > 0; this.root.instanceMatrix.needsUpdate = true; this.data.needsUpdate = this.up.needsUpdate = true;
   }
 }

@@ -203,6 +203,7 @@ export class Game {
     } else this.accumulator = 0;
     this.view.cameraLook = frozen ? 0 : this.controls.cameraLook();
     this.view.update(frozen ? 0 : dt, this.phase, this.celebration, frozen ? 1 : this.accumulator / STEP);
+    this.view.stadium.presentation.setMatch(this.blue, this.orange, this.remaining, this.practice, this.overtime, this.phase);
     this.view.draw();
     const car = this.physics.player;
     this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, boosting: car.boosting && !frozen, speed: car.speed, supersonic: car.supersonic, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime, practice: this.practice }, frozen ? 0 : dt);
@@ -224,7 +225,9 @@ export class Game {
   }
   advance(seconds: number, input: Partial<Input> = {}) {
     for (let i = 0; i < seconds / STEP; i++) this.tick({ ...emptyInput(), ...input, jump: i === 0 && !!input.jump });
-    this.view.update(1 / 60, this.phase, this.celebration); return this.snapshot();
+    this.view.update(1 / 60, this.phase, this.celebration);
+    this.view.stadium.presentation.setMatch(this.blue, this.orange, this.remaining, this.practice, this.overtime, this.phase);
+    return this.snapshot();
   }
   scenario(name: string) {
     this.view.effects.demolitions.reset(); this.goalBlastPending = false;

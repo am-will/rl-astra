@@ -8,6 +8,7 @@ import { createLargeBoostPad, createSmallBoostPad } from './boost-pad';
 import { createGoalFrame } from './goal-frame';
 import { UltraGrass } from './ultra-grass';
 import { rampMaterial, decorateRamp } from './ramp-decoration';
+import { StadiumPresentation } from './stadium-presentation';
 
 function turfTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 1536; canvas.height = 2048;
@@ -113,14 +114,19 @@ export class Stadium {
   private padAnimations: ((cooldown: number, time: number) => void)[] = [];
   goalLights: T.PointLight[] = [];
   grass: UltraGrass;
+  presentation: StadiumPresentation;
   wallMaterial!: T.ShaderMaterial;
   constructor(public scene: T.Scene, pads: Pad[]) {
+    this.presentation = new StadiumPresentation(scene);
     const architecture = new T.Group(); architecture.name = 'stadium-architecture'; scene.add(architecture);
     const endStands = new T.Group(); endStands.name = 'end-stands'; architecture.add(endStands);
     const structural = material(0x253747, .7, .55), concrete = material(0x17232d, .3, .76), seatMat = material(0x132c42, .15, .7);
-    const blueGlow = new T.MeshStandardMaterial({ color: BLUE, emissive: BLUE, emissiveIntensity: 2.5 });
-    const orangeGlow = new T.MeshStandardMaterial({ color: ORANGE, emissive: ORANGE, emissiveIntensity: 2.5 });
+    const blueGlow = this.presentation.lightMaterial(BLUE, 3.4);
+    const orangeGlow = this.presentation.lightMaterial(ORANGE, 3.4);
     const whiteGlow = new T.MeshStandardMaterial({ color: 0xdaf4ff, emissive: 0xc2eaff, emissiveIntensity: 3.2 });
+    const screenMat = this.presentation.displayMaterial(), ribbonMat = this.presentation.displayMaterial(true);
+    const adMaterials = new Map<string, T.MeshLambertMaterial>();
+    const flagMat = this.presentation.flagMaterial(labelTexture('RLCS', '#f1d795', '#163351', 256, 512));
     const fieldMat = new T.MeshStandardMaterial({ map: turfTexture(), bumpMap: grassDetail(), bumpScale: .085, roughness: .94, metalness: 0 });
     fieldMat.onBeforeCompile = shader => {
       shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_BUMPMAP\ndiffuseColor.rgb *= .50 + texture2D(bumpMap, vBumpMapUv).r * .85;\n#endif');
@@ -147,19 +153,25 @@ export class Stadium {
       }
     }
     // Continuous light rails follow the actual boundary, including corner curves.
-    for (const side of [-1, 1]) for (const level of [2.65, 8.7, FIELD.height - FIELD.rampRadius]) {
+    // Leave the ramp lip as metal trim; the animated rails belong higher in the arena.
+    for (const side of [-1, 1]) for (const level of [FIELD.height - FIELD.rampRadius]) {
       const boundary = sideBoundary(side);
       for (const half of [-1, 1]) {
         const points = boundary.filter(p => p.z * half >= 0).map(p => new T.Vector3(p.x - p.nx * .045, level, p.z - p.nz * .045));
-        const rail = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points), points.length, level === 2.65 ? .065 : .032, 5, false), half > 0 ? blueGlow : orangeGlow); architecture.add(rail);
+        const rail = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points), points.length, .032, 5, false), half > 0 ? blueGlow : orangeGlow); architecture.add(rail);
       }
     }
     for (const s of [-1, 1]) {
       const teamMat = s === 1 ? blueGlow : orangeGlow, teamColor = s === 1 ? BLUE : ORANGE;
       for (let z = -33; z <= 33; z += 11) {
         box(architecture, [.17, 18, .2], [s * (w + .2), 9, z], structural);
-        const adMat = new T.MeshStandardMaterial({ map: labelTexture(z % 22 === 0 ? 'ROCKET LEAGUE' : 'CHAMPIONS FIELD', '#c6e7f4', z > 0 ? '#123964' : '#684328'), emissive: 0xffffff, emissiveMap: labelTexture(z % 22 === 0 ? 'ROCKET LEAGUE' : 'CHAMPIONS FIELD', '#c6e7f4', z > 0 ? '#123964' : '#684328'), emissiveIntensity: .3 });
-        const ad = new T.Mesh(new T.PlaneGeometry(10.65, 1.25), adMat); ad.position.set(s * (w - .08), 3.65, z); ad.rotation.y = -s * Math.PI / 2; architecture.add(ad);
+        const label = z % 22 === 0 ? 'ROCKET LEAGUE' : 'CHAMPIONS FIELD', key = `${label}:${z > 0}`;
+        let adMat = adMaterials.get(key);
+        if (!adMat) {
+          const texture = labelTexture(label, '#c6e7f4', z > 0 ? '#123964' : '#684328');
+          adMat = new T.MeshLambertMaterial({ name: 'stadium-static-advertising', map: texture, reflectivity: 0 }); adMaterials.set(key, adMat);
+        }
+        const ad = new T.Mesh(new T.PlaneGeometry(10.65, 1.25), adMat); ad.name = 'stadium-static-ad'; ad.position.set(s * (w - .08), 3.65, z); ad.rotation.y = -s * Math.PI / 2; scene.add(ad); fadeNearCamera(ad);
       }
       for (let row = 0; row < 13; row++) {
         box(architecture, [2.4, .8, 119 + row * .55], [s * (43 + row * 1.45), 3 + row * .87, 0], row % 4 === 0 ? concrete : seatMat);
@@ -169,6 +181,11 @@ export class Stadium {
       }
       box(architecture, [1, 3.4, 143], [s * 65, 16, 0], concrete);
       box(architecture, [132, 3.4, 1], [0, 16, s * 77], concrete);
+      for (const end of [false, true]) {
+        const ribbon = new T.Mesh(new T.PlaneGeometry(end ? 130 : 142, 1.6), ribbonMat); ribbon.name = 'stadium-panorama-ribbon';
+        ribbon.position.set(end ? 0 : s * 64.4, 16.2, end ? s * 76.4 : 0);
+        ribbon.rotation.y = end ? (s > 0 ? Math.PI : 0) : -s * Math.PI / 2; scene.add(ribbon); fadeNearCamera(ribbon);
+      }
       for (let z = -55; z <= 55; z += 22) {
         box(architecture, [2.2, 15, 2.4], [s * 56, 10, z], concrete);
         box(architecture, [.22, 13, .22], [s * 54.7, 10, z - 1.1], z > 0 ? blueGlow : orangeGlow);
@@ -178,7 +195,8 @@ export class Stadium {
       box(architecture, [.13, .12, 132], [s * 58.8, 12.95, 0], s === 1 ? blueGlow : orangeGlow);
       box(architecture, [.2, .18, 144], [s * 64.4, 17.65, 0], whiteGlow);
       box(architecture, [130, .18, .2], [0, 17.65, s * 76.4], teamMat);
-      const goalFrame = createGoalFrame(s); scene.add(goalFrame);
+      const goalChannels = this.presentation.lightMaterial(teamColor, 2.8); goalChannels.side = T.DoubleSide;
+      const goalFrame = createGoalFrame(s, goalChannels); scene.add(goalFrame);
       goalFrame.traverse(o => { if (o instanceof T.Mesh && o.name !== 'goal-hex-floor' && o.material instanceof T.MeshStandardMaterial) fadeNearCamera(o); });
       // Recessed stadium service tiers sit beyond the transparent goal shell.
       // They provide a dark backdrop without putting seats or walls in the net.
@@ -188,8 +206,8 @@ export class Stadium {
       }
       const goalLamp = new T.PointLight(teamColor, 48, 24, 2); goalLamp.position.set(0, 4, s * (l + 2)); scene.add(goalLamp); this.goalLights.push(goalLamp);
       // Floating video boards and continuous light ribbons.
-      const screen = new T.Mesh(new T.PlaneGeometry(26, 11), new T.MeshStandardMaterial({ map: labelTexture('ROCKET\u2002LEAGUE', '#ecf8ff', '#0a2443', 1024, 384), emissive: 0x8caeff, emissiveIntensity: .3 }));
-      screen.position.set(s * 66, 25, 0); screen.rotation.y = -s * Math.PI / 2; scene.add(screen);
+      const screen = new T.Mesh(new T.PlaneGeometry(26, 11), screenMat);
+      screen.name = 'stadium-live-screen'; screen.position.set(s * 65.94, 25, 0); screen.rotation.y = -s * Math.PI / 2; scene.add(screen);
       box(architecture, [1, 12, 27], [s * 66.5, 25, 0], concrete);
       box(architecture, [.3, .15, 28], [s * 65.8, 31.2, 0], whiteGlow);
       for (let z = -62; z <= 62; z += 20.6) {
@@ -205,8 +223,9 @@ export class Stadium {
         cylinderBetween(architecture, new T.Vector3(x, 35, s * 68), new T.Vector3(x, 38, s * 46), .19, structural);
       }
       for (let z = -52; z <= 52; z += 13) {
-        const banner = new T.Mesh(new T.PlaneGeometry(3.2, 6), new T.MeshBasicMaterial({ map: labelTexture('RLCS', '#f1d795', '#163351', 128, 256), side: T.DoubleSide }));
-        banner.position.set(s * 60, 27, z); banner.rotation.y = Math.PI / 2; scene.add(banner);
+        if (z === 0) continue; // Keep the live scoreboard clear of the hanging cloth.
+        const banner = new T.Mesh(new T.PlaneGeometry(3.2, 6, 10, 20), flagMat);
+        banner.name = 'stadium-wind-banner'; banner.position.set(s * 60, 27, z); banner.rotation.y = -s * Math.PI / 2; scene.add(banner); fadeNearCamera(banner);
       }
     }
     this.makeCrowd(scene);
@@ -222,6 +241,7 @@ export class Stadium {
   }
   makeCrowd(scene: T.Scene) {
     const count = 10500, geometry = new T.SphereGeometry(.14, 5, 4), mat = material(0xffffff, .05, .9);
+    this.presentation.animateCrowd(mat);
     const crowd = new T.InstancedMesh(geometry, mat, count), dummy = new T.Object3D(); crowd.name = 'stadium-crowd';
     const colors = [0x2c6395, 0x265379, 0x828c72, 0xae8537, 0x4e7183, 0x183452, 0x487f9b];
     let seed = 12; const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -234,7 +254,7 @@ export class Stadium {
       }
       dummy.position.set(side < 2 ? (side ? -1 : 1) * (43 + row * 1.45) : along, 3.8 + row * .87, side < 2 ? along : (side === 2 ? 1 : -1) * (56 + row * 1.5));
       dummy.scale.set(.9 + rand(), 1.2 + rand() * .7, .9 + rand()); dummy.updateMatrix(); crowd.setMatrixAt(i, dummy.matrix); crowd.setColorAt(i, new T.Color(colors[Math.floor(rand() * colors.length)]));
-    } scene.add(crowd); fadeNearCamera(crowd);
+    } scene.add(crowd); fadeNearCamera(crowd); this.presentation.addCrowdLights(crowd);
     const stars = new Float32Array(600 * 3);
     for (let i = 0; i < 600; i++) { stars[i * 3] = (rand() - .5) * 600; stars[i * 3 + 1] = 50 + rand() * 200; stars[i * 3 + 2] = (rand() - .5) * 600; }
     scene.add(new T.Points(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(stars, 3)), new T.PointsMaterial({ color: 0xb0cef8, size: .22, transparent: true, opacity: .8 })));
@@ -262,6 +282,7 @@ export class Stadium {
 
   }
   update(pads: Pad[], time: number) {
+    this.presentation.update(time);
     pads.forEach((p, i) => this.padAnimations[i](p.cooldown, time));
   }
   updateCamera(position: T.Vector3) {

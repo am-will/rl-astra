@@ -18,6 +18,8 @@ import { FollowCamera } from './follow-camera';
 import { RocketBoost } from './rocket-boost';
 import { SpeedTrails } from './speed-trails';
 import { FlameSmoke } from './flame-smoke';
+import { ExhaustBackfire } from './exhaust-backfire';
+import { BOOST_OUTLET } from './octane-outlets';
 import { BallDirection } from './ball-direction';
 import { TurfDebris } from './turf-debris';
 import { CarPaint, validPaintJob, type PaintJob } from './car-paint';
@@ -44,6 +46,7 @@ export class GameRenderer {
   effects: Effects;
   boosts: [RocketBoost, RocketBoost];
   infernos: [FlameSmoke, FlameSmoke];
+  exhausts: [ExhaustBackfire, ExhaustBackfire];
   boostStyle: BoostStyle = 'classic';
   paintJob: PaintJob = 'ultraviolet';
   carPaint!: CarPaint;
@@ -115,6 +118,7 @@ export class GameRenderer {
     this.effects = new Effects(this.scene);
     this.boosts = [new RocketBoost(this.scene), new RocketBoost(this.scene)];
     this.infernos = [new FlameSmoke(this.scene), new FlameSmoke(this.scene)];
+    this.exhausts = [new ExhaustBackfire(this.scene), new ExhaustBackfire(this.scene)];
     this.speedTrails = [new SpeedTrails(this.scene), new SpeedTrails(this.scene, true)];
     this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
     this.turfDebris = [new TurfDebris(this.scene), new TurfDebris(this.scene)];
@@ -147,17 +151,23 @@ export class GameRenderer {
   /** Prepare first-use shader programs, textures and buffers while the loading screen is up. */
   async prepareGraphics() {
     const passStates = this.composer.passes.map(pass => pass.enabled), toScreen = this.composer.renderToScreen;
-    const grassVisible = this.stadium.grass.mesh.visible, skyVisible = this.sky.visible;
+    const grassVisible = this.stadium.grass.mesh.visible, skyVisible = this.sky.visible, atmosphereVisible = this.stadium.presentation.atmosphere.visible;
     const target = this.renderer.getRenderTarget();
     const culling: [T.Object3D, boolean][] = [];
     try {
       this.effects.goal(new T.Vector3(0, 3, FIELD.length), 0x39b7ff);
       for (const burst of this.effects.demolitions.bursts) burst.trigger(this.player.root.position, new T.Vector3(), new T.Quaternion(), 0xff931f);
       this.effects.update(.7); // Includes the delayed singularity and every debris/smoke material.
+      for (const [i, model] of [this.player, this.bot].entries()) {
+        this.boosts[i].update(model.root.position, model.root.quaternion, new T.Vector3(), true, .12);
+        this.infernos[i].update(model.root.position, model.root.quaternion, new T.Vector3(), true, .12, this.camera);
+        this.exhausts[i].update(model.root.position, model.root.quaternion, 0, 0, false, true, 0, model.lighting?.exhaustOutlet);
+        this.exhausts[i].trigger();
+      }
       for (const root of [this.effects.explosion.root, ...this.effects.demolitions.bursts.map(b => b.root)]) {
         root.traverse(object => { culling.push([object, object.frustumCulled]); object.frustumCulled = false; });
       }
-      this.stadium.grass.mesh.visible = this.sky.visible = true;
+      this.stadium.grass.mesh.visible = this.sky.visible = this.stadium.presentation.atmosphere.visible = true;
       this.composer.passes.forEach(pass => { pass.enabled = true; });
       this.composer.renderToScreen = false;
       this.scene.updateMatrixWorld(true);
@@ -168,8 +178,9 @@ export class GameRenderer {
       this.draw();
     } finally {
       this.effects.explosion.reset(); this.effects.demolitions.reset();
+      this.boosts.forEach(effect => effect.reset()); this.infernos.forEach(effect => effect.reset()); this.exhausts.forEach(effect => effect.reset());
       for (const [object, frustumCulled] of culling) object.frustumCulled = frustumCulled;
-      this.stadium.grass.mesh.visible = grassVisible; this.sky.visible = skyVisible;
+      this.stadium.grass.mesh.visible = grassVisible; this.sky.visible = skyVisible; this.stadium.presentation.atmosphere.visible = atmosphereVisible;
       this.composer.passes.forEach((pass, i) => { pass.enabled = passStates[i]; });
       this.composer.renderToScreen = toScreen; this.renderer.setRenderTarget(target);
       this.update(0, 'ready');
@@ -185,6 +196,7 @@ export class GameRenderer {
     // Smooth the actual composed image, including fine grass and bright engine cores.
     this.antialias.enabled = ultra;
     this.stadium.grass.mesh.visible = ultra; this.sky.visible = ultra;
+    this.stadium.presentation.atmosphere.visible = ultra;
     this.sun.color.setHex(ultra ? 0xffdab0 : 0xe2f2ff); this.sun.intensity = ultra ? 3.3 : 2.2;
     this.sun.position.set(ultra ? -50 : -25, ultra ? 42 : 65, ultra ? -35 : 22);
     this.sun.target.position.set(0, 0, 0);
@@ -210,20 +222,23 @@ export class GameRenderer {
     model.root.visible = car.demolished <= 0;
     model.root.position.lerpVectors(car.previousPosition, new T.Vector3().copy(car.body.translation()), alpha); model.root.quaternion.slerpQuaternions(car.previousRotation, new T.Quaternion().copy(car.body.rotation()), alpha);
     for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
-    const active = car.boosting && car.demolished <= 0 && (car !== this.physics.bot || this.physics.botEnabled);
+    const enabled = model.root.visible && (car !== this.physics.bot || this.physics.botEnabled);
+    const active = car.boosting && enabled;
     const index = model === this.player ? 0 : 1, velocity = new T.Vector3().copy(car.body.linvel());
     const signedSpeed = velocity.dot(new T.Vector3(0, 0, -1).applyQuaternion(model.root.quaternion));
     const braking = (car.drifting && car.speed > .5) || (!active && (car.throttle < -.05 || car.throttle * signedSpeed < -.5));
-    model.lighting?.update(dt, active, braking);
+    const engineThrottle = car.throttle * signedSpeed < -.5 ? 0 : car.throttle;
+    model.lighting?.update(dt, active, braking, engineThrottle, enabled);
+    this.exhausts[index].update(model.root.position, model.root.quaternion, car.speed, car.throttle, active, enabled, dt, model.lighting?.exhaustOutlet);
     const classic = this.boostStyle === 'classic';
+    if (!enabled) { this.boosts[index].reset(); this.infernos[index].reset(); }
     this.boosts[index].update(model.root.position, model.root.quaternion, velocity, active && classic, dt);
     this.boosts[index].root.visible &&= classic;
-    if (car.demolished > 0 || (index === 1 && !this.physics.botEnabled)) this.infernos[index].reset();
     this.infernos[index].update(model.root.position, model.root.quaternion, velocity, active && this.boostStyle === 'inferno', dt, this.camera);
     this.speedTrails[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, car.speed, car.supersonic, model.root.visible && (car !== this.physics.bot || this.physics.botEnabled), dt);
     if (active && classic && dt > 0 && Math.random() < dt * 35) {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
-      this.effects.emit(new T.Vector3(Math.random() < .5 ? -.255 : .255, .025, 1.6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
+      this.effects.emit(new T.Vector3((Math.random() < .5 ? -1 : 1) * BOOST_OUTLET.x, BOOST_OUTLET.y + (Math.random() - .5) * BOOST_OUTLET.height, BOOST_OUTLET.z + .6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
     }
     this.turfDebris[index].update(model, car, this.physics.pads, dt, model.root.visible && (index === 0 || this.physics.botEnabled), this.qualityLevel === 'ultra');
     this.stadium.grass.setTireContacts(index, this.turfDebris[index].contacts, model.root.quaternion);
