@@ -1,0 +1,48 @@
+import {chromium} from 'playwright';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+await mkdir('test-results/fidelity',{recursive:true});
+const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+const errors=[],results=[];const check=(name,pass,detail)=>{assert.ok(pass,`${name}: ${JSON.stringify(detail)}`);results.push({name,detail});console.log(`PASS ${name}`)};
+try{
+ const p=await browser.newPage({viewport:{width:1440,height:900}});p.on('pageerror',e=>errors.push(e.message));p.on('console',e=>{if(e.type()==='error')errors.push(e.text())});
+ const ready=()=>p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
+ await p.goto('http://127.0.0.1:5179');await ready();
+ await p.evaluate(()=>{const g=window.__game;g.scenario('drive');g.view.ballCam=false;g.view.cameraReady=false;g.action('pause');});
+ await p.locator('[data-action="visuals"]').click();
+ check('Camera and visuals opens as the active paused dialog',await p.evaluate(()=>window.__game.paused&&window.__game.visualSettings.visible&&document.querySelector('#pause-panel').hidden),{});
+ for(const [key,value]of Object.entries({fov:86,height:3.1,distance:6.7,angle:18}))await p.locator(`#camera-${key}`).fill(String(value));
+ await p.locator('#visual-quality').selectOption('ultra');await p.locator('#boost-style').selectOption('inferno');
+ await p.waitForTimeout(100);
+ const live=await p.evaluate(()=>{const g=window.__game,v=g.view;return{fov:v.camera.fov,height:v.camera.position.y-v.player.root.position.y,distance:Math.hypot(v.camera.position.x-v.player.root.position.x,v.camera.position.z-v.player.root.position.z),pitch:Math.asin(-v.camera.getWorldDirection(v.look.clone()).y)*180/Math.PI,settings:v.followCamera.settings,grass:v.stadium.grass.mesh.visible,count:v.stadium.grass.mesh.count,style:v.boostStyle};});
+ check('All four camera sliders update the live paused view independently',Math.abs(live.fov-86)<.01&&Math.abs(live.height-3.1)<.01&&Math.abs(live.distance-6.7)<.01&&Math.abs(live.pitch-18)<.01,live);
+ check('Ultra enables actual grass geometry and Inferno remains selectable',live.grass&&live.count>=180000&&live.style==='inferno',live);
+ await p.locator('#camera-fov').focus();await p.keyboard.press('ArrowRight');
+ check('Native keyboard sliders work while driving is suspended',await p.evaluate(()=>window.__game.view.followCamera.settings.fov===87&&window.__game.controls.read().throttle===0),{});
+ await p.evaluate(()=>{const g=window.__game;document.querySelector('#camera-height').focus();g.visualSettings.navigate('right');document.querySelector('#boost-style').focus();g.visualSettings.navigate('left');g.visualSettings.navigate('right');});
+ check('Controller navigation adjusts ranges and boost selector',await p.evaluate(()=>Math.abs(window.__game.view.followCamera.settings.height-3.15)<.001&&window.__game.view.boostStyle==='inferno'),{});
+ await p.reload();await ready();
+ const saved=await p.evaluate(()=>({settings:window.__game.view.followCamera.settings,quality:window.__game.view.qualityLevel,style:window.__game.view.boostStyle,grass:window.__game.view.stadium.grass.mesh.visible}));
+ check('Camera, Ultra and boost style all persist after reload',saved.settings.fov===87&&saved.settings.height===3.15&&saved.settings.distance===6.7&&saved.settings.angle===18&&saved.quality==='ultra'&&saved.style==='inferno'&&saved.grass,saved);
+ await p.evaluate(()=>{window.__game.action('visuals');});await p.locator('#reset-camera').click();await p.locator('#preview-camera').click();await p.waitForTimeout(60);
+ check('Reset restores only camera defaults',await p.evaluate(()=>{const v=window.__game.view;return v.followCamera.settings.fov===69&&v.followCamera.settings.distance===4.9&&v.qualityLevel==='ultra'&&v.boostStyle==='inferno';}),{});
+ await p.keyboard.press('Escape');check('Escape returns to pause before resuming play',await p.evaluate(()=>!window.__game.visualSettings.visible&&window.__game.paused&&!document.querySelector('#pause-panel').hidden),{});
+ await p.keyboard.press('Escape');check('Second Escape resumes the field',await p.evaluate(()=>!window.__game.paused&&!window.__game.controls.menu),{});
+ const fx=await p.evaluate(async()=>{const T=await import('/node_modules/.vite/deps/three.js'),g=window.__game,v=g.view;g.testing=true;const effect=v.infernos[0],rows=[];
+  for(const hz of [30,60,144]){effect.reset();for(let i=0;i<hz;i++)effect.update(new T.Vector3(0,.4,-i*18/hz),new T.Quaternion(),new T.Vector3(0,0,-18),true,1/hz,v.camera);const count=effect.root.count;effect.update(new T.Vector3(0,.4,-18),new T.Quaternion(),new T.Vector3(),false,0,v.camera);const paused=effect.root.count;for(let i=0;i<hz;i++)effect.update(new T.Vector3(0,.4,-18),new T.Quaternion(),new T.Vector3(),false,1/hz,v.camera);rows.push({hz,count,paused,expired:effect.root.count});}
+  effect.update(new T.Vector3(0,.4,0),new T.Quaternion(),new T.Vector3(),true,.1,v.camera);effect.update(new T.Vector3(30,.4,0),new T.Quaternion(),new T.Vector3(),false,0,v.camera);const teleport=effect.root.count;
+  v.setBoostStyle('classic');return{rows,teleport,classic:v.boostStyle};});
+ check('Inferno remains bounded at 30, 60 and 144 Hz and freezes when paused',fx.rows.every(r=>r.count>85&&r.count<=160&&r.paused===r.count),fx);
+ check('Smoke expires after release and clears on teleport or style switch',fx.rows.every(r=>r.expired===0)&&fx.teleport===0&&fx.classic==='classic',fx);
+ const render=await p.evaluate(()=>{const v=window.__game.view;v.cameraReady=false;v.update(0,'playing');v.draw();return{triangles:v.renderer.info.render.triangles,calls:v.renderer.info.render.calls};});
+ check('Ultra compiles and renders the full field',render.triangles>3000000,render);
+ await p.evaluate(()=>window.__game.action('visuals'));await p.setViewportSize({width:390,height:844});
+ const mobile=await p.evaluate(()=>{const r=document.querySelector('.visual-menu').getBoundingClientRect(),close=document.querySelector('#close-visuals').getBoundingClientRect();return{x:r.x,right:r.right,bottom:r.bottom,close:close.bottom,width:innerWidth,height:innerHeight};});
+ check('Mobile settings keep the panel and Done button in view',mobile.x>=0&&mobile.right<=mobile.width&&mobile.bottom<=mobile.height&&mobile.close<=mobile.height,mobile);
+ await p.screenshot({path:'test-results/fidelity/settings-mobile.png'});
+ await p.evaluate(()=>{localStorage.setItem('champions-field.camera','{"fov":999,"height":null,"distance":-100,"angle":"bad"}');localStorage.setItem('champions-field.quality','invalid');localStorage.setItem('champions-field.boost-style','invalid');});await p.reload();await ready();
+ const corrupt=await p.evaluate(()=>({camera:window.__game.view.followCamera.settings,quality:window.__game.view.qualityLevel,style:window.__game.view.boostStyle}));
+ check('Invalid saved preferences clamp or fall back safely',corrupt.camera.fov===110&&corrupt.camera.height===2.05&&corrupt.camera.distance===2.8&&corrupt.camera.angle===10&&corrupt.quality==='performance'&&corrupt.style==='classic',corrupt);
+ check('No browser or shader errors',errors.length===0,errors);
+ await mkdir('test-results/fidelity',{recursive:true});await writeFile('test-results/fidelity/behavior.json',JSON.stringify({results,errors},null,2));
+}finally{await browser.close()}

@@ -15,6 +15,7 @@ Open **http://127.0.0.1:5179/**. Press **W** or squeeze **R2** to begin the thre
 npm run build     # Type-check and build production files
 npm run preview   # Serve the production build
 npm test          # Gameplay, arena, aerial control, keyboard/controller, and settings checks
+npm run test:fidelity # Camera preferences, Ultra shaders, boost effects, and responsive settings
 npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
 npm run test:speed    # Supersonic timing, momentum after ball hits, and wheel trails
 npm run test:hud      # Boost gauge, pickup feedback, scoreboard and compact layouts
@@ -67,7 +68,11 @@ Open **Esc / Options → Controls & bindings** to replace, add, or remove keyboa
 
 Land all four wheel traces on the ball to regain the flip. Opposing pitch cancels an ongoing forward/backward flip. Landing on the wheels cancels a dodge and allows wavedash-style recovery. Small boost pads provide 12 boost and respawn after four seconds; large pads refill the tank and respawn after ten seconds.
 
-Performance rendering is the default, with the same models, shadows, textures and explosion animations and no bloom. The visual-quality selection is saved across reloads. High enables bloom and additional pixel density; Performance avoids the intermittent dark flashing reported with High in Chrome.
+Open **Esc / Options → Camera & visuals** for saved FOV, camera height, distance, and downward-angle sliders. The field remains visible for a live paused preview. Car cam follows the selected pitch; ball cam biases its framing while keeping the ball visible. Switch camera modes from the preview button. Camera reset leaves quality and boost preferences intact.
+
+**Performance** is the default and includes the detailed Octane materials, textured field, shadows, and all gameplay effects without bloom. **High** adds bloom and extra pixel density. **Ultra** adds 500,000 instanced grass tufts, warm sunset lighting, richer reflections, 4096px shadows, and up to 2× pixel density. All tiers share the painted team crests, infield lanes, and physical car materials. Ultra costs more GPU time; choose Performance for the lightest rendering.
+
+The saved **Boost style** selector offers **Classic**, the original focused orange afterburner, and **Inferno**, a hot rolling plume that cools into gray smoke. Inferno particles remain in world space through turns, expire after release, and clear on teleports or style changes. Both styles work in every quality tier.
 
 Press **P** to toggle untimed solo practice, which starts immediately and skips kickoff countdowns. The pause menu includes solo practice, a five-minute match against Maverick, restart, unlimited boost, audio, and performance rendering. Tied matches enter sudden-death overtime. The clock stays at zero while a live ball is airborne.
 

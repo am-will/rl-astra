@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs",
+    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs && node tests/fidelity.mjs",
     "test:goals": "node tests/goals.mjs",
     "test:hud": "node tests/hud.mjs",
     "test:speed": "node tests/speed.mjs",
@@ -19,7 +19,8 @@
     "test:feel-live": "node tests/feel-live.mjs",
     "test:impact": "node tests/impact.mjs",
     "test:impact-visuals": "node tests/impact-visuals.mjs",
-    "test:impact-live": "node tests/impact-live.mjs"
+    "test:impact-live": "node tests/impact-live.mjs",
+    "test:fidelity": "node tests/fidelity.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",

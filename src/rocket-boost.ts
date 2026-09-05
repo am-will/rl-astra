@@ -3,13 +3,15 @@ import * as T from 'three';
 /** Classic orange afterburner: white-hot core, rippling flame sheath and tapered tips. */
 export class RocketBoost {
   root = new T.Group();
+  lengthScale = 1;
+  luminosity = 1;
   private strength = 0;
   private time = 0;
   private localVelocity = new T.Vector3();
   private inverse = new T.Quaternion();
   private uniforms = {
     time: { value: 0 }, strength: { value: 0 }, length: { value: 1.4025 },
-    drift: { value: new T.Vector2() }, core: { value: 0 },
+    drift: { value: new T.Vector2() }, core: { value: 0 }, luminosity: { value: 1 },
   };
   constructor(scene: T.Scene) {
     this.root.name = 'standard-orange-boost'; this.root.visible = false; scene.add(this.root);
@@ -26,7 +28,7 @@ export class RocketBoost {
         vec4 eye=modelViewMatrix*vec4(p,1.);vEye=-eye.xyz;vNormal=normalMatrix*normal;
         gl_Position=projectionMatrix*eye;
       }`;
-    const fragmentShader = `uniform float time,strength,core;varying vec2 vUv;varying float vT;varying vec3 vEye;varying vec3 vNormal;
+    const fragmentShader = `uniform float time,strength,core,luminosity;varying vec2 vUv;varying float vT;varying vec3 vEye;varying vec3 vNormal;
       void main(){float t=vT;float flow=t*29.-time*39.;
         float tongues=sin(flow+sin(vUv.x*18.85+time*8.)*2.2)*.5+.5;
         float striation=sin(vUv.x*50.26+sin(flow)*1.7)*.5+.5;
@@ -38,7 +40,7 @@ export class RocketBoost {
         vec3 hot=mix(vec3(3.4,3.2,2.5),vec3(3.0,1.4,.25),smoothstep(.15,.95,t));
         color=mix(color,hot,core);
         float alpha=body*mix(.57,.82,core)*smoothstep(.03,.55,edge)*strength*smoothstep(.2,.8,vEye.z);
-        gl_FragColor=vec4(color,alpha);
+        gl_FragColor=vec4(color*luminosity,alpha);
       }`;
     for (const x of [-.255, .255]) for (const core of [0, 1]) {
       const uniforms = { ...this.uniforms, core: { value: core } };
@@ -57,6 +59,7 @@ export class RocketBoost {
     this.localVelocity.copy(velocity).applyQuaternion(this.inverse.copy(rotation).invert());
     this.uniforms.drift.value.lerp(new T.Vector2(-this.localVelocity.x, -this.localVelocity.y), 1 - Math.exp(-dt * 12));
     this.uniforms.length.value = (1.6 + Math.min(1, velocity.length() / 23) * 1.25 + Math.sin(this.time * 37) * .07) * .75 * .85;
+    this.uniforms.length.value *= this.lengthScale; this.uniforms.luminosity.value = this.luminosity;
     this.uniforms.time.value = this.time; this.uniforms.strength.value = this.strength;
   }
 }

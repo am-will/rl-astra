@@ -35,6 +35,8 @@ try{
  await p.evaluate(()=>window.__game.action('quality'));await p.reload();await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
  check('High quality preference survives reload',await p.evaluate(()=>window.__game.view.quality&&window.__game.view.bloom.enabled),{});
  await p.evaluate(()=>window.__game.action('quality'));await p.reload();await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
+ check('Ultra quality preference survives reload',await p.evaluate(()=>window.__game.view.qualityLevel==='ultra'&&window.__game.view.stadium.grass.mesh.visible),{});
+ await p.evaluate(()=>window.__game.action('quality'));await p.reload();await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
  check('Performance preference survives reload',await p.evaluate(()=>!window.__game.view.quality&&!window.__game.view.bloom.enabled&&localStorage.getItem('champions-field.quality')==='performance'),{});
  const goalFinish=await p.evaluate(()=>{const meshes=window.__game.view.scene.children;const ramps=meshes.filter(m=>m.name==='arena-goal-ramp');const nets=meshes.filter(m=>m.name==='arena-goal-net');return{count:ramps.length,clear:ramps.every(m=>m.material.transparent&&!m.material.depthWrite&&nets.some(n=>n.material===m.material))};});
  check('Both curved goal interiors share transparent net material',goalFinish.count===2&&goalFinish.clear,goalFinish);

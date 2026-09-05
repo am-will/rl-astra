@@ -1,4 +1,5 @@
 import { MathUtils, Matrix4, PerspectiveCamera, Quaternion, Vector3 } from 'three';
+import { loadCameraSettings } from './camera-settings';
 import { FIELD } from './config';
 
 const UP = new Vector3(0, 1, 0);
@@ -9,6 +10,7 @@ function spring(value: number, velocity: number, target: number, frequency: numb
   return [target + (offset + step) * decay, (velocity - frequency * step) * decay];
 }
 export class FollowCamera {
+  settings = loadCameraSettings();
   forward = new Vector3(0, 0, -1);
   look = new Vector3();
   private yaw = 0;
@@ -38,8 +40,8 @@ export class FollowCamera {
     const ballYaw = planarDistance > .65 ? Math.atan2(-toBall.x, -toBall.z) : this.yaw;
     const stableBallYaw = this.yaw + shortest(ballYaw - this.yaw) * MathUtils.smoothstep(planarDistance, .65, 2.2);
     let desiredYaw = carYaw + shortest(stableBallYaw - carYaw) * this.mode;
-    const baseDistance = 4.9 + speed * .025;
-    const probe = (yaw: number) => pos.clone().add(new Vector3(Math.sin(yaw) * baseDistance, 2.05, Math.cos(yaw) * baseDistance));
+    const baseDistance = this.settings.distance + speed * .025;
+    const probe = (yaw: number) => pos.clone().add(new Vector3(Math.sin(yaw) * baseDistance, this.settings.height, Math.cos(yaw) * baseDistance));
     const directClearance = clear(pos, probe(desiredYaw));
     if (directClearance < baseDistance * .95) {
       // Begin orbiting before a solid ramp reaches the camera. Choose the
@@ -61,13 +63,13 @@ export class FollowCamera {
       this.yawVelocity = MathUtils.clamp(velocity, -4 * response, 4 * response);
     }
     this.forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const height = 2.05;
+    const height = this.settings.height;
     const carFocus = pos.clone().addScaledVector(UP, .2);
     // Fit the angular span of car and ball, rather than capping the look target
     // a few metres above the car. The full-height ball can now stay in frame.
     const elevation = Math.atan2(Math.max(0, toBall.y), Math.max(.1, planarDistance));
     const overheadFov = 8 * MathUtils.smoothstep(elevation, .55, 1.3) * this.mode;
-    const baseFov = (camera.aspect < 1.3 ? 78 : 69) + Math.max(0, speed - 14) * .6 + overheadFov;
+    const baseFov = (this.settings.fov + (camera.aspect < 1.3 ? 9 : 0)) + Math.max(0, speed - 14) * .6 + overheadFov;
     const vertical = MathUtils.degToRad(baseFov), horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect);
     const available = Math.min(vertical, horizontal) * .80;
     let fit = baseDistance;
@@ -92,13 +94,15 @@ export class FollowCamera {
     else this.clearance = MathUtils.damp(this.clearance, limit, 6, dt);
     desired = pos.clone().addScaledVector(offset, Math.min(length, this.clearance) / length);
     camera.position.copy(desired);
-    const chaseTarget = pos.clone().addScaledVector(this.forward, 3.75).addScaledVector(UP, .625);
-    const chase = chaseTarget.sub(desired).normalize();
+    const pitch = MathUtils.degToRad(this.settings.angle);
+    const chase = this.forward.clone().multiplyScalar(Math.cos(pitch)).addScaledVector(UP, -Math.sin(pitch));
     const carDirection = carFocus.clone().sub(desired).normalize(), ballDirection = ball.clone().sub(desired).normalize();
     const span = carDirection.angleTo(ballDirection);
     // When a wall prevents backing up far enough, prioritize keeping the ball
     // in view. Otherwise the car sits below the ball with comfortable margins.
-    const weight = Math.max(.54, 1 - available * .44 / Math.max(.001, span));
+    const minimumWeight = 1 - available * .44 / Math.max(.001, span);
+    const weight = MathUtils.clamp(.54 + (10 - this.settings.angle) * .008, Math.max(0, minimumWeight), 1);
+    // Angle also biases ball-cam framing, while its visibility limit keeps the ball on screen.
     const ballAim = carDirection.lerp(ballDirection, weight).normalize();
     const chaseRotation = new Quaternion().setFromRotationMatrix(this.matrix.lookAt(desired, desired.clone().add(chase), UP));
     const ballRotation = new Quaternion().setFromRotationMatrix(this.matrix.lookAt(desired, desired.clone().add(ballAim), UP));

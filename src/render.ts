@@ -15,6 +15,10 @@ import { createBlastPass } from './blast-pass';
 import { FollowCamera } from './follow-camera';
 import { RocketBoost } from './rocket-boost';
 import { SpeedTrails } from './speed-trails';
+import { FlameSmoke } from './flame-smoke';
+
+export type QualityLevel = 'performance' | 'high' | 'ultra';
+export type BoostStyle = 'classic' | 'inferno';
 
 export class GameRenderer {
   scene = new T.Scene();
@@ -29,6 +33,8 @@ export class GameRenderer {
   ballGround: T.Mesh;
   effects: Effects;
   boosts: [RocketBoost, RocketBoost];
+  infernos: [FlameSmoke, FlameSmoke];
+  boostStyle: BoostStyle = 'classic';
   speedTrails: [SpeedTrails, SpeedTrails];
   audio = new GameAudio();
   ballCam = true;
@@ -38,10 +44,19 @@ export class GameRenderer {
   cameraForward = new T.Vector3(0, 0, -1);
   cameraReady = false;
   followCamera = new FollowCamera();
-  quality = false;
+  qualityLevel: QualityLevel = 'performance';
+  get quality() { return this.qualityLevel !== 'performance'; }
+  private sun = new T.DirectionalLight();
+  private fill = new T.DirectionalLight();
+  private ambient = new T.HemisphereLight(0xc5e1ff, 0x233524, 1.25);
+  private sky!: T.Mesh;
   private playerWasDemolished = false;
   constructor(container: HTMLElement, public physics: Physics) {
-    try { this.quality = localStorage.getItem('champions-field.quality') === 'high'; } catch { /* Use Performance when storage is unavailable. */ }
+    try {
+      const saved = localStorage.getItem('champions-field.quality');
+      if (saved === 'high' || saved === 'ultra') this.qualityLevel = saved;
+      if (localStorage.getItem('champions-field.boost-style') === 'inferno') this.boostStyle = 'inferno';
+    } catch { /* Use the default visual preset when storage is unavailable. */ }
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(this.quality ? Math.min(devicePixelRatio, 1.5) : 1); this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
@@ -49,12 +64,23 @@ export class GameRenderer {
     this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
     this.renderer.domElement.id = 'game-canvas'; this.renderer.domElement.setAttribute('aria-label', '3D car soccer arena. Use W A S D to drive.'); container.prepend(this.renderer.domElement);
     this.scene.background = new T.Color(0x0b172d); this.scene.fog = new T.FogExp2(0x102139, .0045);
-    const pmrem = new T.PMREMGenerator(this.renderer); const env = new RoomEnvironment(); this.scene.environment = pmrem.fromScene(env, .04).texture; pmrem.dispose(); env.dispose(); this.scene.environmentIntensity = .48;
-    this.scene.add(new T.HemisphereLight(0xc5e1ff, 0x233524, 1.25));
-    const moon = new T.DirectionalLight(0xe2f2ff, 2.2); moon.position.set(-25, 65, 22); moon.castShadow = true;
+    const pmrem = new T.PMREMGenerator(this.renderer), env = new RoomEnvironment();
+    // Broad light banks create legible reflections across the small car's curved panels.
+    for (const side of [-1, 1]) {
+      const panel = new T.Mesh(new T.PlaneGeometry(10, 2), new T.MeshBasicMaterial({ color: new T.Color(side > 0 ? 0xd3eaff : 0xffc98c).multiplyScalar(1.4), side: T.DoubleSide }));
+      panel.position.set(side * 6, 6, -3); panel.lookAt(0, 0, 0); env.add(panel);
+    }
+    this.scene.environment = pmrem.fromScene(env, .025).texture; pmrem.dispose(); env.dispose(); this.scene.environmentIntensity = .48;
+    this.sky = new T.Mesh(new T.SphereGeometry(240, 40, 24), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false,
+      vertexShader: 'varying vec3 vDirection;void main(){vDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader: `varying vec3 vDirection;void main(){vec3 d=normalize(vDirection);float horizon=exp(-max(d.y,0.)*7.);vec3 color=mix(vec3(.025,.07,.16),vec3(.54,.39,.25),horizon);float sun=pow(max(0.,dot(d,normalize(vec3(-50.,42.,-35.)))),180.);color+=vec3(1.7,.85,.3)*sun;gl_FragColor=vec4(color,1.);#include <tonemapping_fragment>
+#include <colorspace_fragment>}`.replace(';#include',';\n#include') }));
+    this.sky.name = 'ultra-sunset-sky'; this.sky.renderOrder = -5; this.scene.add(this.sky);
+    this.scene.add(this.ambient);
+    const moon = this.sun; moon.color.setHex(0xe2f2ff); moon.intensity = 2.2; moon.position.set(-25, 65, 22); moon.castShadow = true;
     moon.shadow.mapSize.set(2048, 2048); moon.shadow.camera.left = -65; moon.shadow.camera.right = 65; moon.shadow.camera.top = 65; moon.shadow.camera.bottom = -65; moon.shadow.camera.far = 160; moon.shadow.bias = -.0005; moon.shadow.normalBias = .025;
     this.scene.add(moon);
-    const fill = new T.DirectionalLight(0x90c9ff, 1.1); fill.position.set(45, 24, -35); this.scene.add(fill);
+    const fill = this.fill; fill.color.setHex(0x90c9ff); fill.intensity = 1.1; fill.position.set(45, 24, -35); this.scene.add(fill);
     this.stadium = new Stadium(this.scene, physics.pads);
     this.player = createCarModel('blue'); this.bot = createCarModel('orange'); this.scene.add(this.player.root, this.bot.root);
     this.player.root.scale.setScalar(.5); this.bot.root.scale.setScalar(.5);
@@ -67,12 +93,14 @@ export class GameRenderer {
     }
     this.effects = new Effects(this.scene);
     this.boosts = [new RocketBoost(this.scene), new RocketBoost(this.scene)];
+    this.infernos = [new FlameSmoke(this.scene), new FlameSmoke(this.scene)];
     this.speedTrails = [new SpeedTrails(this.scene), new SpeedTrails(this.scene, true)];
     this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
     this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
     this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
     window.addEventListener('resize', () => this.resize());
+    this.setQuality(this.qualityLevel);
     this.update(0, 'ready');
   }
   async loadAssets() {
@@ -90,18 +118,37 @@ export class GameRenderer {
     this.update(0, 'ready');
   }
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); }
-  toggleQuality() {
-    this.quality = !this.quality;
-    const pixelRatio = this.quality ? Math.min(devicePixelRatio, 1.5) : 1;
-    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.resize();
-    try { localStorage.setItem('champions-field.quality', this.quality ? 'high' : 'performance'); } catch { /* The selected mode still applies for this session. */ }
+  toggleQuality() { const modes: QualityLevel[] = ['performance', 'high', 'ultra']; this.setQuality(modes[(modes.indexOf(this.qualityLevel) + 1) % modes.length]); }
+  setQuality(level: QualityLevel) {
+    this.qualityLevel = level;
+    const ultra = level === 'ultra', pixelRatio = Math.min(devicePixelRatio, ultra ? 2 : this.quality ? 1.5 : 1);
+    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.bloom.radius = ultra ? .4 : .45; this.bloom.threshold = ultra ? 2.2 : 1.2;
+    this.stadium.grass.mesh.visible = ultra; this.sky.visible = ultra;
+    this.sun.color.setHex(ultra ? 0xffc786 : 0xe2f2ff); this.sun.intensity = ultra ? 3.1 : 2.2;
+    this.sun.position.set(ultra ? -50 : -25, ultra ? 42 : 65, ultra ? -35 : 22);
+    this.fill.intensity = ultra ? 1.2 : 1.1; this.ambient.intensity = ultra ? .8 : 1.25; this.scene.environmentIntensity = ultra ? .58 : .48;
+    (this.scene.fog as T.FogExp2).color.setHex(ultra ? 0x34464d : 0x102139); (this.scene.fog as T.FogExp2).density = ultra ? .0034 : .0045;
+    const size = ultra ? 4096 : 2048;
+    if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.sun.shadow.mapSize.set(size, size); }
+    this.resize();
+    try { localStorage.setItem('champions-field.quality', level); } catch { /* The selected mode still applies for this session. */ }
+  }
+  setBoostStyle(style: BoostStyle) {
+    this.boostStyle = style; this.infernos.forEach(effect => effect.reset());
+    try { localStorage.setItem('champions-field.boost-style', style); } catch { /* Apply without persistence. */ }
   }
   syncCar(model: CarModel, car: Car, dt: number, alpha: number) {
     model.root.visible = car.demolished <= 0;
     model.root.position.lerpVectors(car.previousPosition, new T.Vector3().copy(car.body.translation()), alpha); model.root.quaternion.slerpQuaternions(car.previousRotation, new T.Quaternion().copy(car.body.rotation()), alpha);
     for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
     const active = car.boosting && car.demolished <= 0 && (car !== this.physics.bot || this.physics.botEnabled);
-    this.boosts[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, new T.Vector3().copy(car.body.linvel()), active, dt);
+    const index = model === this.player ? 0 : 1, velocity = new T.Vector3().copy(car.body.linvel());
+    // Inferno keeps a short nozzle core beneath the expanding world-space plume.
+    this.boosts[index].lengthScale = this.boostStyle === 'inferno' ? .4 : 1;
+    this.boosts[index].luminosity = this.boostStyle === 'inferno' ? .4 : 1;
+    this.boosts[index].update(model.root.position, model.root.quaternion, velocity, active, dt);
+    if (car.demolished > 0 || (index === 1 && !this.physics.botEnabled)) this.infernos[index].reset();
+    this.infernos[index].update(model.root.position, model.root.quaternion, velocity, active && this.boostStyle === 'inferno', dt, this.camera);
     this.speedTrails[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, car.speed, car.supersonic, model.root.visible && (car !== this.physics.bot || this.physics.botEnabled), dt);
     if (active && dt > 0 && Math.random() < dt * 35) {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
@@ -131,8 +178,8 @@ export class GameRenderer {
       (obj as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>).material.opacity = .55 / Math.max(1, owner.position.y * .55);
     }
     this.stadium.update(this.physics.pads, this.time); this.effects.update(dt);
-    this.bloom.strength = .32 + this.effects.explosion.impact * .35;
-    this.renderer.toneMappingExposure = 1.05 - this.effects.explosion.impact * .16;
+    this.bloom.strength = (this.qualityLevel === 'ultra' ? .22 : .32) + this.effects.explosion.impact * .35;
+    this.renderer.toneMappingExposure = (this.qualityLevel === 'ultra' ? 1.08 : 1.05) - this.effects.explosion.impact * .16;
     const car = this.physics.player, pos = this.player.root.position, q = this.player.root.quaternion;
     if (this.playerWasDemolished && car.demolished <= 0) this.cameraReady = false;
     this.playerWasDemolished = car.demolished > 0;
@@ -146,6 +193,7 @@ export class GameRenderer {
     this.camera.updateMatrixWorld();
     this.effects.demolitions.updateCamera(this.camera.position);
     this.stadium.updateCamera(this.camera.position);
+    this.stadium.grass.update(this.camera.position, this.player.root.position, this.time);
     const blastCenter = this.effects.explosion.root.position.clone().project(this.camera);
     this.blast.enabled = this.effects.explosion.root.visible && blastCenter.z < 1 && Number.isFinite(blastCenter.x) && Number.isFinite(blastCenter.y);
     this.blast.uniforms.center.value.set(blastCenter.x * .5 + .5, blastCenter.y * .5 + .5);

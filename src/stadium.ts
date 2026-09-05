@@ -6,17 +6,18 @@ import { detailedCar, detailedBall } from './models';
 import { arenaSurfaces, sideBoundary, honeycombMaterial } from './arena';
 import { createLargeBoostPad, createSmallBoostPad } from './boost-pad';
 import { createGoalFrame } from './goal-frame';
+import { UltraGrass } from './ultra-grass';
 
 function turfTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 1536; canvas.height = 2048;
   const c = canvas.getContext('2d')!, w = canvas.width, h = canvas.height;
-  c.fillStyle = '#1c3c1d'; c.fillRect(0, 0, w, h);
-  for (let i = 0; i < 16; i++) { c.fillStyle = i % 2 ? '#244825' : '#1c3c1d'; c.fillRect(0, i * h / 16, w, h / 16); }
+  c.fillStyle = '#1b3519'; c.fillRect(0, 0, w, h);
+  for (let i = 0; i < 16; i++) { c.fillStyle = i % 2 ? '#294727' : '#1b3519'; c.fillRect(0, i * h / 16, w, h / 16); }
   let seed = 129;
   const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   for (let i = 0; i < 290000; i++) { c.fillStyle = rand() > .5 ? 'rgba(155,181,108,.035)' : 'rgba(10,30,19,.035)'; c.fillRect(rand() * w, rand() * h, .6 + rand() * 1.3, 1 + rand() * 4); }
   const px = (x: number) => (x / (FIELD.width * 2) + .5) * w, pz = (z: number) => (z / (FIELD.length * 2) + .5) * h;
-  c.strokeStyle = '#a4bca4'; c.lineWidth = 5;
+  c.strokeStyle = '#c2cbb1'; c.lineWidth = 5;
   const outline = [...sideBoundary(1), ...sideBoundary(-1).reverse()];
   c.beginPath(); outline.forEach((p, i) => { const x = px(p.x - p.nx * (FIELD.rampRadius + .5)), z = pz(p.z - p.nz * (FIELD.rampRadius + .5)); i ? c.lineTo(x, z) : c.moveTo(x, z); }); c.closePath(); c.stroke();
   c.beginPath(); c.moveTo(px(-35), h / 2); c.lineTo(px(35), h / 2); c.stroke();
@@ -32,6 +33,21 @@ function turfTexture() {
     c.beginPath(); c.ellipse(px(0), pz(z - s * 8), 8 * w / (FIELD.width * 2), 8 * h / (FIELD.length * 2), 0, s === 1 ? Math.PI : 0, s === 1 ? Math.PI * 2 : Math.PI); c.stroke();
     c.font = 'italic 900 53px Arial'; c.textAlign = 'center'; c.fillStyle = 'rgba(170,205,162,.18)';
     c.save(); c.translate(px(0), pz(s * 22)); if (s > 0) c.rotate(Math.PI); c.fillText('CHAMPIONS', 0, 0); c.font = '600 24px Arial'; c.fillText('F I E L D', 0, 35); c.restore();
+    // Team-coloured infield crests, chevrons and an etched outer lane.
+    c.save(); c.translate(px(0), pz(s * 31)); if (s > 0) c.rotate(Math.PI);
+    c.scale(w / (FIELD.width * 2), h / (FIELD.length * 2));
+    c.fillStyle = s > 0 ? 'rgba(36,145,224,.42)' : 'rgba(227,128,44,.42)';
+    c.strokeStyle = s > 0 ? 'rgba(121,203,244,.62)' : 'rgba(255,202,128,.62)'; c.lineWidth = .13;
+    c.beginPath(); c.moveTo(-4,-3.5); c.lineTo(4,-3.5); c.lineTo(3.7,.9); c.quadraticCurveTo(3,3.5,0,5); c.quadraticCurveTo(-3,3.5,-3.7,.9); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(224,229,204,.5)';
+    c.beginPath(); c.moveTo(0,-2.7); c.quadraticCurveTo(1.7,-1.1,1.1,1.4); c.lineTo(-1.1,1.4); c.quadraticCurveTo(-1.7,-1.1,0,-2.7); c.fill();
+    c.beginPath(); c.moveTo(-1,0); c.lineTo(-2.3,2); c.lineTo(-1,1.4); c.moveTo(1,0); c.lineTo(2.3,2); c.lineTo(1,1.4); c.fill();
+    c.fillRect(-.32,1.7,.64,1.4); c.restore();
+    for (const lane of [-1,1]) for (let row=0;row<7;row++) {
+      const x=lane*(25+(row%2)*1.5), z=s*(14+row*3.3);
+      c.strokeStyle=s>0?'rgba(92,167,194,.21)':'rgba(203,161,78,.21)'; c.lineWidth=2;
+      c.beginPath(); for(let k=0;k<6;k++){ const a=Math.PI/3*k; const xx=px(x+Math.cos(a)*1.4), zz=pz(z+Math.sin(a)*1.4); k?c.lineTo(xx,zz):c.moveTo(xx,zz); } c.closePath(); c.stroke();
+    }
     c.lineWidth = 9; c.strokeStyle = s === 1 ? 'rgba(79,165,203,.4)' : 'rgba(208,157,77,.4)';
     for (const x of [-30, 30]) { c.beginPath(); c.moveTo(px(x), pz(s * 35)); c.lineTo(px(x + (x > 0 ? -3 : 3)), pz(s * 32)); c.stroke(); }
   }
@@ -64,6 +80,7 @@ export class Stadium {
   padMeshes: T.Group[] = [];
   private padAnimations: ((cooldown: number, time: number) => void)[] = [];
   goalLights: T.PointLight[] = [];
+  grass: UltraGrass;
   wallMaterial!: T.ShaderMaterial;
   constructor(public scene: T.Scene, pads: Pad[]) {
     const architecture = new T.Group(); architecture.name = 'stadium-architecture'; scene.add(architecture);
@@ -72,12 +89,13 @@ export class Stadium {
     const blueGlow = new T.MeshStandardMaterial({ color: BLUE, emissive: BLUE, emissiveIntensity: 2.5 });
     const orangeGlow = new T.MeshStandardMaterial({ color: ORANGE, emissive: ORANGE, emissiveIntensity: 2.5 });
     const whiteGlow = new T.MeshStandardMaterial({ color: 0xdaf4ff, emissive: 0xc2eaff, emissiveIntensity: 3.2 });
-    const fieldMat = new T.MeshStandardMaterial({ map: turfTexture(), bumpMap: grassDetail(), bumpScale: .055, roughness: .94, metalness: 0 });
+    const fieldMat = new T.MeshStandardMaterial({ map: turfTexture(), bumpMap: grassDetail(), bumpScale: .085, roughness: .94, metalness: 0 });
     fieldMat.onBeforeCompile = shader => {
-      shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_BUMPMAP\ndiffuseColor.rgb *= .75 + texture2D(bumpMap, vBumpMapUv).r * .5;\n#endif');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_BUMPMAP\ndiffuseColor.rgb *= .50 + texture2D(bumpMap, vBumpMapUv).r * .85;\n#endif');
     };
     const field = new T.Mesh(new T.PlaneGeometry(FIELD.width * 2, FIELD.length * 2), fieldMat);
-    field.rotation.x = -Math.PI / 2; field.receiveShadow = true; scene.add(field);
+    field.rotation.x = -Math.PI / 2; field.receiveShadow = true; field.name = 'textured-playing-field'; scene.add(field);
+    this.grass = new UltraGrass(scene, fieldMat.map!, pads);
     const apron = box(architecture, [110, 1, 130], [0, -.55, 0], material(0x182936)); apron.receiveShadow = true;
     const glass = honeycombMaterial(.045);
     this.wallMaterial = glass;

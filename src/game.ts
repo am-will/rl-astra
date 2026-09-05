@@ -3,6 +3,7 @@ import { Controls } from './controls';
 import { Physics } from './physics';
 import { GameRenderer } from './render';
 import { HUD } from './hud';
+import { VisualSettings } from './visual-settings';
 import { ControlsMenu, navigateMenu } from './controls-menu';
 import { emptyInput, MATCH_LENGTH, STEP, FIELD, BLUE, ORANGE, CAR, type Input } from './config';
 
@@ -11,6 +12,7 @@ export class Game {
   physics = new Physics(); controls = new Controls(); hud = new HUD();
   view!: GameRenderer;
   controlsMenu!: ControlsMenu;
+  visualSettings!: VisualSettings;
   phase: Phase = 'ready'; paused = false; help = false;
   blue = 0; orange = 0; remaining = MATCH_LENGTH; overtime = false;
   phaseTime = 0; elapsed = 0; accumulator = 0; previous = 0; fps = 60;
@@ -20,12 +22,15 @@ export class Game {
   async init() {
     await this.physics.init();
     this.view = new GameRenderer(document.querySelector('#app')!, this.physics);
-    this.hud.set('quality-value', this.view.quality ? 'HIGH' : 'PERFORMANCE');
+    this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT');
     this.hud.camera(this.view.ballCam);
     try { await this.view.loadAssets(); } catch (error) { console.warn('Detailed assets unavailable; using the procedural car and ball.', error); }
     this.hud.onAction = action => this.action(action);
     this.controlsMenu = new ControlsMenu(this.controls, this.hud.root);
     this.controlsMenu.onClose = () => this.action('close-bindings');
+    this.visualSettings = new VisualSettings(this.view, this.hud.root);
+    this.visualSettings.onClose = () => this.action('close-visuals');
+    this.visualSettings.onChange = () => { this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT'); this.hud.camera(this.view.ballCam); };
     this.controls.onAction = action => this.action(action);
     this.controls.onActivity = () => {
       this.view.audio.init();
@@ -38,7 +43,8 @@ export class Game {
     };
     this.controls.onMenu = input => {
       if (input === 'back') { this.action('pause'); return; }
-      if (this.controlsMenu.visible) this.controlsMenu.navigate(input);
+      if (this.visualSettings.visible) this.visualSettings.navigate(input);
+      else if (this.controlsMenu.visible) this.controlsMenu.navigate(input);
       else {
         const panel = this.hud.el(this.help ? 'help-panel' : 'pause-panel');
         navigateMenu(Array.from(panel.querySelectorAll<HTMLElement>('button')).filter(e => e.getClientRects().length > 0), input);
@@ -74,6 +80,7 @@ export class Game {
     if (action === 'fullscreen') { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen().catch(() => this.hud.toast('FULLSCREEN IS NOT AVAILABLE')); }
     if (action === 'pause') {
       if (this.controls.capture) this.controls.cancelCapture();
+      else if (this.visualSettings.visible) this.action('close-visuals');
       else if (this.controlsMenu.visible) this.action('close-bindings');
       else if (this.help) { this.help = false; this.hud.el('help-panel').hidden = true; }
       else { this.paused = !this.paused; this.hud.pause(this.paused, this.phase === 'ended', this.blue > this.orange); }
@@ -83,18 +90,20 @@ export class Game {
     if (action === 'restart') this.restart();
     if (action === 'reset' && !this.paused && !this.help && !this.controlsMenu.visible) { this.physics.resetCar(this.physics.player); this.view.cameraReady = false; this.hud.toast('CAR RESET'); }
     if (action === 'mode') { this.practice = !this.practice; this.physics.botEnabled = !this.practice; this.hud.set('mode-value', this.practice ? 'SOLO PRACTICE' : '1V1 · MAVERICK'); this.hud.set('match-type', this.practice ? 'SOLO PRACTICE' : 'EXHIBITION · 1V1'); this.hud.mode(!this.practice); this.restart(); }
-    if (action === 'quality') { this.view.toggleQuality(); this.hud.set('quality-value', this.view.quality ? 'HIGH' : 'PERFORMANCE'); }
+    if (action === 'quality') { this.view.toggleQuality(); this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT'); }
     if (action === 'help') { this.help = !this.help; this.hud.el('help-panel').hidden = !this.help; this.controls.clear(); }
     if (action === 'close-help') { this.help = false; this.hud.el('help-panel').hidden = true; this.controls.clear(); }
     if (action === 'bindings') { this.paused = true; this.help = false; this.hud.el('help-panel').hidden = true; this.hud.pause(false); this.controlsMenu.open(); }
     if (action === 'close-bindings') { this.controlsMenu.close(); this.hud.pause(true); this.hud.root.querySelector<HTMLButtonElement>('[data-action="bindings"]')!.focus(); }
+    if (action === 'visuals') { this.paused = true; this.hud.pause(false); this.visualSettings.open(); this.controls.clear(); }
+    if (action === 'close-visuals') { this.visualSettings.close(); this.hud.pause(true); this.hud.root.querySelector<HTMLButtonElement>('[data-action="visuals"]')!.focus(); }
     this.syncMenu();
   }
   syncMenu() {
-    this.controls.setMenuMode(this.paused || this.help || this.controlsMenu.visible || this.phase === 'ended');
+    this.controls.setMenuMode(this.paused || this.help || this.controlsMenu.visible || this.visualSettings.visible || this.phase === 'ended');
     // Only the topmost menu participates in keyboard focus or pointer input.
-    this.hud.el('pause-panel').inert = this.help || this.controlsMenu.visible;
-    for (const selector of ['.top-actions', '.bottom-left', '.controls-strip']) (this.hud.root.querySelector(selector) as HTMLElement).inert = this.paused || this.help || this.controlsMenu.visible;
+    this.hud.el('pause-panel').inert = this.help || this.controlsMenu.visible || this.visualSettings.visible;
+    for (const selector of ['.top-actions', '.bottom-left', '.controls-strip']) (this.hud.root.querySelector(selector) as HTMLElement).inert = this.paused || this.help || this.controlsMenu.visible || this.visualSettings.visible;
   }
   restart() {
     this.view.effects.explosion.reset();
@@ -166,7 +175,7 @@ export class Game {
     const dt = Math.min(.05, (now - (this.previous || now)) / 1000); this.previous = now;
     this.fps = this.fps * .97 + (dt > 0 ? 1 / dt : 60) * .03;
     this.syncMenu(); this.controls.poll(now); this.controlsMenu.update();
-    const frozen = this.controlsMenu.visible || this.paused || this.help || this.phase === 'ended' || this.testing;
+    const frozen = this.visualSettings.visible || this.controlsMenu.visible || this.paused || this.help || this.phase === 'ended' || this.testing;
     if (!frozen) {
       this.accumulator += dt;
       const input = this.controls.read();
