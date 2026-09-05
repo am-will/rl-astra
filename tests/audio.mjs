@@ -33,6 +33,34 @@ try {
  await p.waitForFunction(()=>window.__game.view.audio.engineRevs<.1);
  const releasedKickoff=await p.evaluate(()=>({phase:window.__game.phase,load:window.__game.view.audio.engineLoad,revs:window.__game.view.audio.engineRevs}));
  check('Releasing kickoff throttle drops back to idle during the countdown',releasedKickoff.phase==='countdown'&&releasedKickoff.load<.02&&releasedKickoff.revs<.1,releasedKickoff);
+ const limiterPCM=await p.evaluate(async()=>{
+  const {GameAudio}=await import('/src/game-audio.ts');
+  const nativeContext=window.AudioContext,buffers=window.__game.view.audio.buffers;
+  const render=async(limited)=>{
+   const ctx=new OfflineAudioContext(1,48000*6,48000);
+   window.AudioContext=function(){return ctx;};
+   let a;try{a=new GameAudio();a.init();}finally{window.AudioContext=nativeContext;}
+   for(const [key,buffer]of buffers)a.buffers.set(key,buffer);
+   // Measure the production engine bus, independently of tires and countdown cues.
+   a.master.disconnect();a.engineGain.connect(ctx.destination);
+   const car={speed:16,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:1};
+   for(let i=0;i<360;i++)a.update(car,true,1/60,limited);
+   const atGo=ctx.suspend(3.2),rendering=ctx.startRendering();await atGo;
+   a.update(car,true,1/60,false);await ctx.resume();
+   const pcm=(await rendering).getChannelData(0);
+   const envelope=(start,end)=>{
+    const bins=[];let total=0,peak=0;
+    for(let i=Math.round(start*48000);i<end*48000;i+=480){let energy=0;for(let j=0;j<480;j++){const x=pcm[i+j];energy+=x*x;peak=Math.max(peak,Math.abs(x));}bins.push(Math.sqrt(energy/480));total+=energy;}
+    const band=f=>{let sin=0,cos=0,sum=0;for(let i=0;i<bins.length;i++){sin+=bins[i]*Math.sin(2*Math.PI*f*i/100);cos+=bins[i]*Math.cos(2*Math.PI*f*i/100);sum+=bins[i];}return 2*Math.hypot(sin,cos)/sum;};
+    return{pulse:band(7.5),neighbors:[band(5),band(10)],rms:Math.sqrt(total/(bins.length*480)),peak};
+   };
+   return{before:envelope(.8,3.2),after:envelope(3.6,6)};
+  };
+  return{steady:await render(false),limited:await render(true)};
+ });
+ check('Kickoff PCM bounces off the limiter 7.5 times per second without increasing engine volume',limiterPCM.limited.before.pulse>.12&&limiterPCM.limited.before.pulse>limiterPCM.steady.before.pulse*3&&limiterPCM.limited.before.neighbors.every(n=>n<limiterPCM.limited.before.pulse*.5)&&limiterPCM.limited.before.rms<limiterPCM.steady.before.rms&&limiterPCM.limited.before.peak<.4,limiterPCM);
+ check('The limiter pulse stops at GO while the engine continues',limiterPCM.limited.after.pulse<.06&&limiterPCM.limited.after.pulse<limiterPCM.limited.before.pulse*.3&&limiterPCM.limited.after.rms>.01,limiterPCM.limited);
+ check('Redline has stronger output during kickoff and driving, with ample peak headroom',limiterPCM.limited.before.rms>.033&&limiterPCM.limited.before.rms<.045&&limiterPCM.steady.before.rms>.043&&limiterPCM.steady.before.rms<.055&&limiterPCM.steady.before.peak<.4,limiterPCM);
  await p.evaluate(()=>{window.requestAnimationFrame=()=>0;});await p.waitForTimeout(80);
  await p.evaluate(()=>{
   const g=window.__game,a=g.view.audio;g.practice=true;g.physics.botEnabled=false;g.scenario('drive');a.reset();a.setPaused(false);
@@ -43,7 +71,7 @@ try {
   const a=window.__game.view.audio, car={speed:0,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};a.update(car,true,1/60);await new Promise(r=>setTimeout(r,250));const idle=await window.audioEnergy();
   car.speed=20;car.throttle=1;for(let i=0;i<150;i++)a.update(car,true,1/60);await new Promise(r=>setTimeout(r,400));const fast=await window.audioEnergy();const mix=[...a.loops].map(([key,l])=>({key,rate:l.source.playbackRate.value,gain:l.gain.gain.value,buffer:!!l.source.buffer}));return{idle,fast,mix};
  });
- check('Driving reaches a higher redline with controlled output volume',engine.idle.rms>.003&&engine.fast.rms>.02&&engine.fast.rms<.04&&engine.mix.every(x=>x.buffer)&&engine.mix.find(x=>x.key==='engineIdle').gain<.01&&engine.mix.find(x=>x.key==='engineHigh').gain>.1&&engine.mix.find(x=>x.key==='engineHigh').rate>1.32&&engine.mix.find(x=>x.key==='engineHigh').rate<1.42&&engine.mix.filter(x=>x.key.startsWith('engine')).every(x=>x.rate<1.7),engine);
+ check('Driving reaches a higher redline with controlled output volume',engine.idle.rms>.003&&engine.fast.rms>.033&&engine.fast.rms<.06&&engine.fast.peak<.4&&engine.mix.every(x=>x.buffer)&&engine.mix.find(x=>x.key==='engineIdle').gain<.01&&engine.mix.find(x=>x.key==='engineHigh').gain>.1&&engine.mix.find(x=>x.key==='engineHigh').rate>1.32&&engine.mix.find(x=>x.key==='engineHigh').rate<1.42&&engine.mix.filter(x=>x.key.startsWith('engine')).every(x=>x.rate<1.7),engine);
  const unload=await p.evaluate(async()=>{const a=window.__game.view.audio,c={speed:20,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};for(let i=0;i<120;i++)a.update(c,true,1/60);await new Promise(r=>setTimeout(r,350));const coast={revs:a.engineRevs,load:a.engineLoad,high:a.loops.get('engineHigh').gain.gain.value};c.grounded=false;c.throttle=1;for(let i=0;i<120;i++)a.update(c,true,1/60);return{coast,air:a.engineRevs};});
  check('Releasing throttle at high speed unloads the motor; aerials cannot force a redline',unload.coast.revs<.15&&unload.coast.load<.01&&unload.coast.high<.001&&unload.air<.4,unload);
  const boost=await p.evaluate(async()=>{const a=window.__game.view.audio,c={speed:20,boosting:true,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};a.update(c,true,1/60);const start=[...a.voices].some(v=>v.source.buffer===a.buffers.get('boostStart'));await new Promise(r=>setTimeout(r,2000));const energy=await window.audioEnergy();c.boosting=false;a.update(c,true,1/60);const release=[...a.voices].some(v=>v.source.buffer===a.buffers.get('boostStop'));await new Promise(r=>setTimeout(r,450));return{start,release,energy,loopGain:a.loops.get('boostLoop').gain.gain.value};});

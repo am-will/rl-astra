@@ -43,11 +43,6 @@ export function detailedCar(source: T.Group, team: 'blue' | 'orange'): CarModel 
     meshes.forEach(mesh => { mesh.geometry.translate(-center.x, -center.y, -center.z); group.add(mesh); });
     group.position.copy(center); group.rotation.order = 'YXZ'; group.userData.front = key.startsWith('F'); root.add(group); wheels.push(group);
   }
-  // Headlamps and exhaust cores are emissive inserts, independent of the painted body.
-  const glow = new T.MeshStandardMaterial({ color: 0xc5efff, emissive: 0x9adfff, emissiveIntensity: 2 });
-  for (const x of [-.5, .5]) {
-    const lamp = new T.Mesh(new T.SphereGeometry(.0275, 10, 6), glow); lamp.position.set(x * .5, -.06, -.73); lamp.scale.set(1.4, .65, .4); root.add(lamp);
-  }
   const tail = new T.MeshStandardMaterial({ color: 0x5c0615, emissive: 0xff1433, emissiveIntensity: 1.8, roughness: .2 });
   for (const side of [-1, 1]) {
     const light = new T.Mesh(new T.BoxGeometry(.12, .033, .014), tail); light.position.set(side * .37, .07, .704); root.add(light);

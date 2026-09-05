@@ -1,4 +1,4 @@
-export type PadBinding = { type: 'button'; index: number } | { type: 'axis'; index: number; direction: 1 | -1; rest: number };
+export type PadBinding = { type: 'button'; index: number } | { type: 'axis'; index: number; direction: 1 | -1; rest: number; standardOnly?: boolean };
 export type Device = 'keyboard' | 'gamepad';
 export type Category = 'driving' | 'aerial' | 'match';
 const button = (index: number): PadBinding => ({ type: 'button', index });
@@ -19,6 +19,8 @@ export const ACTIONS = [
   { id: 'rollRight', label: 'Air roll right', category: 'aerial', keys: ['KeyE'], pad: [button(5)] },
   { id: 'airRoll', label: 'Air roll modifier', category: 'aerial', keys: [], pad: [button(2)] },
   { id: 'camera', label: 'Toggle ball camera', category: 'match', keys: ['KeyC'], pad: [button(3)] },
+  { id: 'lookLeft', label: 'Look left (hold)', category: 'match', hold: true, keys: [], pad: [{ ...axis(2, -1), standardOnly: true }] },
+  { id: 'lookRight', label: 'Look right (hold)', category: 'match', hold: true, keys: [], pad: [{ ...axis(2, 1), standardOnly: true }] },
   { id: 'pause', label: 'Pause / options', category: 'match', keys: ['Escape'], pad: [button(9)] },
   { id: 'mode', label: 'Toggle practice mode', category: 'match', keys: ['KeyP'], pad: [] },
   { id: 'reset', label: 'Reset car', category: 'match', keys: ['KeyR'], pad: [button(12)] },
@@ -51,7 +53,7 @@ export const validKey = (key: unknown): key is string => typeof key === 'string'
 export function validPad(value: unknown): value is PadBinding {
   if (!value || typeof value !== 'object') return false;
   const p = value as PadBinding;
-  return Number.isInteger(p.index) && p.index >= 0 && (p.type === 'button' ? p.index < 64 : p.type === 'axis' && p.index < 32 && [1, -1].includes(p.direction) && Number.isFinite(p.rest) && Math.abs(p.rest) <= 1);
+  return Number.isInteger(p.index) && p.index >= 0 && (p.type === 'button' ? p.index < 64 : p.type === 'axis' && p.index < 32 && [1, -1].includes(p.direction) && Number.isFinite(p.rest) && Math.abs(p.rest) <= 1 && (p.standardOnly === undefined || typeof p.standardOnly === 'boolean'));
 }
 export function loadSettings(): ControlSettings {
   const result = defaults();

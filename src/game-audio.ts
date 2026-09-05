@@ -23,6 +23,9 @@ export class GameAudio {
   private hitIndex = 0;
   private engineLoad = 0;
   private engineRevs = 0;
+  private limiterGain?: GainNode;
+  private limiterDepth?: GainNode;
+  private limiterPitch?: GainNode;
 
   constructor() {
     try { this.muted = localStorage.getItem('champions-field.sound') === 'off'; } catch { /* Private browsing. */ }
@@ -65,6 +68,14 @@ export class GameAudio {
       this.mix = ctx.createGain(); this.mix.gain.value = this.paused ? 0 : 1;
       this.mix.connect(compressor); compressor.connect(this.master); this.master.connect(ctx.destination);
       this.engineGain = ctx.createGain(); this.engineGain.gain.value = 0; this.engineGain.connect(this.mix);
+      this.limiterGain = ctx.createGain(); this.limiterGain.connect(this.engineGain);
+      // Clock the redline bounce in audio time so slow frames cannot jitter it.
+      // Both modulation depths start at zero; the ordinary driving mix is unity.
+      const limiter = ctx.createOscillator(); limiter.type = 'triangle'; limiter.frequency.value = 7.5;
+      this.limiterDepth = ctx.createGain(); this.limiterDepth.gain.value = 0;
+      this.limiterPitch = ctx.createGain(); this.limiterPitch.gain.value = 0;
+      limiter.connect(this.limiterDepth); this.limiterDepth.connect(this.limiterGain.gain);
+      limiter.connect(this.limiterPitch); limiter.start();
       void ctx.resume().catch(() => {});
     } catch { /* The rest of the game remains playable when audio is unavailable. */ }
   }
@@ -84,6 +95,7 @@ export class GameAudio {
 
   reset() {
     this.boosting = false; this.engineLoad = this.engineRevs = 0; this.lastCue.clear();
+    this.setLimiter(false);
     for (const voice of [...this.voices]) this.stopVoice(voice);
     for (const loop of this.loops.values()) this.ramp(loop.gain.gain, 0, .015);
     if (this.engineGain) this.ramp(this.engineGain.gain, 0, .015);
@@ -92,6 +104,13 @@ export class GameAudio {
   private ramp(param: AudioParam, value: number, seconds = .06) {
     if (!this.ctx) return;
     param.setTargetAtTime(value, this.ctx.currentTime, seconds);
+  }
+
+  private setLimiter(active: boolean) {
+    // Dip below the existing redline, with no increase in peak engine volume.
+    if (this.limiterGain) this.ramp(this.limiterGain.gain, active ? .78 : 1, .015);
+    if (this.limiterDepth) this.ramp(this.limiterDepth.gain, active ? .22 : 0, .015);
+    if (this.limiterPitch) this.ramp(this.limiterPitch.gain, active ? .04 : 0, .015);
   }
 
   private loop(key: AudioClip, volume: number, rate = 1, engine = false) {
@@ -113,7 +132,9 @@ export class GameAudio {
       }
       const source = this.ctx.createBufferSource(), gain = this.ctx.createGain();
       source.buffer = buffer; source.loop = true; gain.gain.value = 0;
-      source.connect(gain); gain.connect(engine ? this.engineGain! : this.mix); source.start();
+      source.connect(gain); gain.connect(engine ? this.limiterGain! : this.mix);
+      if (key === 'engineLow' || key === 'engineHigh') this.limiterPitch!.connect(source.playbackRate);
+      source.start();
       loop = { source, gain }; this.loops.set(key, loop);
     }
     this.ramp(loop.gain.gain, this.paused ? 0 : volume);
@@ -135,10 +156,13 @@ export class GameAudio {
     this.engineRevs += (targetRevs - this.engineRevs) * (1 - Math.exp(-dt * 5));
     const revs = this.engineRevs, upper = clamp((revs - .48) / .32);
     const pitchLift = 1 + this.engineLoad * clamp((revs - .16) / .64) * .5;
-    this.ramp(this.engineGain.gain, running ? .78 : 0, running ? .06 : .015);
+    const limiting = freeRev && running && this.engineLoad > .9 && revs > .7;
+    this.setLimiter(limiting);
+    const limiterDrop = limiting ? .04 : 0;
+    this.ramp(this.engineGain.gain, running ? 1.56 : 0, running ? .06 : .015);
     this.loop('engineIdle', .6 * (1 - clamp(revs * 2.5)), .88 + revs * .3, true);
-    this.loop('engineLow', (.16 + this.engineLoad * .18) * Math.sin(clamp(revs / .8) * Math.PI), (.75 + revs * .45) * pitchLift, true);
-    this.loop('engineHigh', .13 * upper * this.engineLoad, (.72 + revs * .26) * pitchLift, true);
+    this.loop('engineLow', (.16 + this.engineLoad * .18) * Math.sin(clamp(revs / .8) * Math.PI), (.75 + revs * .45) * pitchLift - limiterDrop, true);
+    this.loop('engineHigh', .13 * upper * this.engineLoad, (.72 + revs * .26) * pitchLift - limiterDrop, true);
     const boost = running && car.boosting;
     if (boost && !this.boosting) this.play('boostStart', .36, 1, 0, .08);
     if (!boost && this.boosting && running) this.play('boostStop', .5, 1, 0, .08);

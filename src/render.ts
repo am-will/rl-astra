@@ -19,6 +19,7 @@ import { SpeedTrails } from './speed-trails';
 import { FlameSmoke } from './flame-smoke';
 import { BallDirection } from './ball-direction';
 import { TurfDebris } from './turf-debris';
+import { CarPaint, validPaintJob, type PaintJob } from './car-paint';
 
 export type QualityLevel = 'performance' | 'high' | 'ultra';
 export type BoostStyle = 'classic' | 'inferno';
@@ -39,10 +40,16 @@ export class GameRenderer {
   boosts: [RocketBoost, RocketBoost];
   infernos: [FlameSmoke, FlameSmoke];
   boostStyle: BoostStyle = 'classic';
+  paintJob: PaintJob = 'ultraviolet';
+  carPaint!: CarPaint;
+  paintPreview = false;
+  paintPreviewAngle: 'front' | 'side' | 'rear' = 'front';
+  private lastPaintFrame = performance.now();
   speedTrails: [SpeedTrails, SpeedTrails];
   turfDebris: [TurfDebris, TurfDebris];
   audio = new GameAudio();
   ballCam = true;
+  cameraLook = 0;
   shake = 0;
   time = 0;
   look = new T.Vector3();
@@ -61,6 +68,8 @@ export class GameRenderer {
       const saved = localStorage.getItem('champions-field.quality');
       if (saved === 'high' || saved === 'ultra') this.qualityLevel = saved;
       if (localStorage.getItem('champions-field.boost-style') === 'inferno') this.boostStyle = 'inferno';
+      const paint = localStorage.getItem('champions-field.paint-job');
+      if (validPaintJob(paint)) this.paintJob = paint;
     } catch { /* Use the default visual preset when storage is unavailable. */ }
     this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(this.quality ? Math.min(devicePixelRatio, 1.5) : 1); this.renderer.setSize(innerWidth, innerHeight);
@@ -88,6 +97,7 @@ export class GameRenderer {
     const fill = this.fill; fill.color.setHex(0x90c9ff); fill.intensity = 1.1; fill.position.set(45, 24, -35); this.scene.add(fill);
     this.stadium = new Stadium(this.scene, physics.pads);
     this.player = createCarModel('blue'); this.bot = createCarModel('orange'); this.scene.add(this.player.root, this.bot.root);
+    this.carPaint = new CarPaint(this.player); this.carPaint.set(this.paintJob);
     this.player.root.scale.setScalar(.5); this.bot.root.scale.setScalar(.5);
     this.ball = createBall(); this.scene.add(this.ball);
     this.ballGround = createBallMarker(); this.scene.add(this.ballGround);
@@ -115,6 +125,7 @@ export class GameRenderer {
     const source = await loadDetailedModels();
     const old = [this.player.root, this.bot.root, this.ball];
     this.player = detailedCar(source.car, 'blue');
+    this.carPaint = new CarPaint(this.player); this.carPaint.set(this.paintJob);
     this.bot = detailedCar(source.car, 'orange');
     this.ball = detailedBall(source.ball);
     const replacement = [this.player.root, this.bot.root, this.ball];
@@ -146,6 +157,10 @@ export class GameRenderer {
     this.boostStyle = style; this.boosts.forEach(effect => effect.reset()); this.infernos.forEach(effect => effect.reset());
     try { localStorage.setItem('champions-field.boost-style', style); } catch { /* Apply without persistence. */ }
   }
+  setPaintJob(paint: PaintJob) {
+    this.paintJob = paint; this.carPaint.set(paint);
+    try { localStorage.setItem('champions-field.paint-job', paint); return true; } catch { return false; }
+  }
   syncCar(model: CarModel, car: Car, dt: number, alpha: number) {
     model.root.visible = car.demolished <= 0;
     model.root.position.lerpVectors(car.previousPosition, new T.Vector3().copy(car.body.translation()), alpha); model.root.quaternion.slerpQuaternions(car.previousRotation, new T.Quaternion().copy(car.body.rotation()), alpha);
@@ -166,6 +181,8 @@ export class GameRenderer {
   }
   update(dt: number, phase: string, celebration?: T.Vector3, alpha = 1) {
     this.time += dt;
+    const paintNow = performance.now();
+    this.carPaint.update(this.paintPreview ? Math.min(.05, (paintNow - this.lastPaintFrame) / 1000) : dt); this.lastPaintFrame = paintNow;
     this.syncCar(this.player, this.physics.player, dt, alpha); this.syncCar(this.bot, this.physics.bot, dt, alpha); this.bot.root.visible &&= this.physics.botEnabled;
     this.ball.visible = phase !== 'goal';
     this.ball.position.lerpVectors(this.physics.ballPreviousPosition, new T.Vector3().copy(this.physics.ball.translation()), alpha); this.ball.quaternion.slerpQuaternions(this.physics.ballPreviousRotation, new T.Quaternion().copy(this.physics.ball.rotation()), alpha);
@@ -176,7 +193,7 @@ export class GameRenderer {
     this.ballGround.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), ground.normal);
     this.ballGround.visible = phase !== 'goal';
     this.ballDirection.update(this.player.root.position, this.ball.position, !this.ballCam && this.player.root.visible && phase !== 'goal' && phase !== 'ended');
-    this.effects.ballTrail(this.ball.position, new T.Vector3().copy(this.physics.ball.linvel()), dt, this.ball.visible);
+    this.effects.ballStreak.update(this.ball.position, new T.Vector3().copy(this.physics.ball.linvel()), dt, this.ball.visible && phase === 'playing');
     for (const obj of this.scene.children) if (obj.name === 'contact-shadow') {
       const owner = obj.userData.owner as T.Object3D; obj.position.set(owner.position.x, .025, owner.position.z); obj.visible = owner.visible;
       (obj as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>).material.opacity = .55 / Math.max(1, owner.position.y * .55);
@@ -188,12 +205,22 @@ export class GameRenderer {
     if (this.playerWasDemolished && car.demolished <= 0) this.cameraReady = false;
     this.playerWasDemolished = car.demolished > 0;
     const focus = phase === 'goal' && celebration ? this.effects.explosion.root.position : this.ball.position;
-    this.followCamera.update(this.camera, pos, q, focus, car.demolished > 0 ? 0 : car.speed, this.ballCam, car.flipTime > 0, dt, !this.cameraReady, (from, to) => this.physics.cameraClearance(from, to));
+    this.followCamera.update(this.camera, pos, q, focus, car.demolished > 0 ? 0 : car.speed, this.ballCam, car.flipTime > 0, dt, !this.cameraReady, (from, to) => this.physics.cameraClearance(from, to), this.cameraLook);
     if (dt > 0 || !this.cameraReady) { this.cameraForward.copy(this.followCamera.forward); this.look.copy(this.followCamera.look); }
     this.cameraReady = true;
     this.shake = Math.max(0, this.shake - dt * 1.5);
     // Render shake never feeds back into the next frame's follow position.
     if (dt > 0) { this.camera.position.x += (Math.random() - .5) * (this.shake * .15 + this.effects.explosion.impact * .35); this.camera.position.y += (Math.random() - .5) * (this.shake * .1 + this.effects.explosion.impact * .23); }
+    if (this.paintPreview) {
+      const narrow = innerWidth <= 650;
+      const angle = { front: [-2.2, 1.15, -2.65], side: [-3.15, 1.05, -.65], rear: [2.15, 1.2, 2.7] }[this.paintPreviewAngle];
+      this.camera.fov = narrow ? 46 : 38; this.camera.updateProjectionMatrix();
+      this.camera.position.copy(pos).add(new T.Vector3(...angle).multiplyScalar(narrow ? 1.75 : 1).applyQuaternion(q));
+      const target = pos.clone().add(new T.Vector3(0, .12, 0).applyQuaternion(q));
+      this.camera.lookAt(target);
+      target.addScaledVector(new T.Vector3(narrow ? 0 : 1, narrow ? 1 : 0, 0).applyQuaternion(this.camera.quaternion), narrow ? -1.4 : .72);
+      this.camera.lookAt(target);
+    }
     this.camera.updateMatrixWorld();
     this.effects.demolitions.updateCamera(this.camera.position);
     this.stadium.updateCamera(this.camera.position);

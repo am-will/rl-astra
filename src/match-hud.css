@@ -1,14 +1,15 @@
 /* The score wings recede at their outside edges; the central clock stays flat. */
 .scoreboard{position:absolute;top:0;z-index:2;left:50%;transform:translateX(-50%);width:284px;font-variant-numeric:tabular-nums}
 .scoreboard-main{display:grid;grid-template-columns:72px 140px 72px;align-items:stretch;height:58px;gap:0}
-.team{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;isolation:isolate;border:1px solid #edf6ff40;background:linear-gradient(160deg,var(--team-top),var(--team-bottom));backdrop-filter:blur(3px) saturate(1.25);box-shadow:inset 0 0 12px #ffffff26,0 0 11px var(--team-glow),0 2px 5px #0003;color:#fff;backface-visibility:hidden}
+.team{position:relative;overflow:visible;display:flex;align-items:center;justify-content:center;isolation:isolate;border:1px solid transparent;color:#fff;backface-visibility:hidden}
 .team-blue{--team-top:#477effe3;--team-bottom:#365dddce;--team-glow:#528aff80;transform-origin:right center;transform:perspective(125px) rotateY(-24deg)}
 .team-orange{--team-top:#ff9d55eb;--team-bottom:#e97835c7;--team-glow:#ffa35c80;transform-origin:left center;transform:perspective(125px) rotateY(24deg)}
-.team:before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#ffffff18,transparent 30%,transparent 65%,#ffffff20)}
+.team:before{content:'';position:absolute;inset:-1px;z-index:-1;border:1px solid #edf6ff40;background:linear-gradient(90deg,#ffffff18,transparent 30%,transparent 65%,#ffffff20),linear-gradient(160deg,var(--team-top),var(--team-bottom));box-shadow:inset 0 0 12px #ffffff26,0 0 8px var(--team-glow);filter:blur(2.75px);pointer-events:none}
 .team strong{display:flex;justify-content:center;align-items:center;font-size:37px;line-height:1;font-weight:400;max-width:calc(100% - 16px);text-align:center}
 .team-label,.clock>span{display:none}
 .score-number-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .team strong svg,.clock>strong svg{display:block;height:1em;max-width:100%;fill:none;stroke:currentColor;stroke-width:2.25;stroke-opacity:1;opacity:1;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 2px #ffffff80)}
+.score-sheen-clip{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .score-sheen{position:absolute;inset:-30% -90%;background:linear-gradient(110deg,transparent 40%,#fff9 50%,transparent 60%);transform:translateX(-65%);opacity:0;pointer-events:none}
 .clock{position:relative;display:flex;align-items:center;justify-content:center;background:linear-gradient(#070a10de,#0e1119ca);backdrop-filter:blur(3px);border-top:1px solid #d5e6f314;border-bottom:1px solid #c5daeb1f}
 .clock>strong{display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1;font-weight:400;max-width:calc(100% - 16px);color:#fff;white-space:nowrap}

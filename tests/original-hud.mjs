@@ -1,0 +1,60 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+await mkdir('test-results/original-ui', {recursive:true});
+const results=[],errors=[];
+const check=(name,pass,detail={})=>{assert.ok(pass,`${name}: ${JSON.stringify(detail)}`);results.push({name,detail});console.log(`PASS ${name}`);};
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+try{
+ const p=await browser.newPage({viewport:{width:1440,height:900}});
+ p.on('pageerror',e=>errors.push(e.message));
+ await p.goto(process.env.GAME_URL||'http://127.0.0.1:5179');await p.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));
+ check('New sessions use Original lettering',await p.locator('#hud').getAttribute('data-text-style')==='original');
+ const ready=await p.evaluate(()=>({text:document.querySelector('#message-title').textContent,paths:document.querySelectorAll('#message-title .arena-lettering path').length,award:getComputedStyle(document.querySelector('.goal-award')).display}));
+ check('Opening shows only the counter, without a goal award or kickoff prompts',ready.text==='3'&&ready.paths>0&&ready.award==='none'&&await p.locator('#message-kicker').textContent()===''&&await p.locator('#message-sub').textContent()==='',ready);
+ await p.keyboard.press('Escape');await p.locator('[data-action="visuals"]').click();
+ await p.locator('#text-style').selectOption('cartoon');
+ check('Settings apply Cartoon immediately',await p.locator('#hud').getAttribute('data-text-style')==='cartoon');
+ await p.reload();await p.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));
+ check('Cartoon preference survives reload',await p.locator('#hud').getAttribute('data-text-style')==='cartoon');
+ await p.evaluate(()=>{const g=window.__game;g.scenario('drive');g.score('blue');});await p.waitForTimeout(380);
+ const cartoon=await p.evaluate(()=>({face:getComputedStyle(document.querySelector('#message-title .comic-face')).backgroundImage,outline:getComputedStyle(document.querySelector('#message-title'),'::after').content,award:getComputedStyle(document.querySelector('.goal-award')).display,original:getComputedStyle(document.querySelector('#message-title .original-face')).display,text:document.querySelector('#message-title').textContent}));
+ check('Cartoon restores its gradient, black outline and scoring text',cartoon.face.includes('linear-gradient')&&cartoon.outline.includes('YOU SCORED!')&&cartoon.award==='none'&&cartoon.original==='none'&&cartoon.text==='YOU SCORED!',cartoon);
+ await p.screenshot({path:'test-results/original-ui/cartoon.png'});
+ await p.keyboard.press('Escape');await p.locator('[data-action="visuals"]').click();
+ await p.locator('#text-style').selectOption('original');
+ await p.locator('#text-style').focus();await p.keyboard.press('c');
+ check('Keyboard can select Cartoon',await p.locator('#hud').getAttribute('data-text-style')==='cartoon');
+ await p.evaluate(()=>window.__game.visualSettings.navigate('left'));
+ check('Controller menu navigation can return to Original',await p.locator('#hud').getAttribute('data-text-style')==='original');
+ await p.screenshot({path:'test-results/original-ui/settings.png'});
+ await p.locator('#close-visuals').click();await p.locator('[data-action="resume"]').click();
+ await p.evaluate(()=>{const g=window.__game;g.hud.message('LION SCORED!','GOOOOOAL!','1 — 0','goal',true);});await p.waitForTimeout(380);
+ await p.screenshot({path:'test-results/original-ui/goal-v2.png'});
+ const goal=await p.evaluate(()=>({award:getComputedStyle(document.querySelector('.goal-award')).display,outline:getComputedStyle(document.querySelector('#message-title'),'::after').content,kicker:getComputedStyle(document.querySelector('#message-kicker')).display,sub:getComputedStyle(document.querySelector('#message-sub')).display,text:document.querySelector('#message-title').textContent}));
+ check('Original goal shows the gold award and plain announcement',goal.award==='flex'&&goal.outline==='none'&&goal.kicker==='none'&&goal.sub==='none'&&goal.text==='LION SCORED!',goal);
+ const scoring=await p.evaluate(()=>{const g=window.__game,read=()=>({text:document.querySelector('#message-title').textContent,award:getComputedStyle(document.querySelector('.goal-award')).display});g.scenario('drive');g.physics.botEnabled=true;g.score('orange');const bot=read();g.kickoff();const countdown=read();g.phase='playing';g.score('blue');return{bot,countdown,player:read()};});
+ check('Only a player goal receives GOAL +100 and the sun emblem',scoring.bot.text==='MAVERICK SCORED!'&&scoring.bot.award==='none'&&scoring.countdown.text==='3'&&scoring.countdown.award==='none'&&scoring.player.text==='YOU SCORED!'&&scoring.player.award==='flex',scoring);
+ await p.waitForTimeout(380);await p.screenshot({path:'test-results/original-ui/player-goal.png'});
+ await p.evaluate(()=>{const g=window.__game;g.kickoff();g.phase='playing';g.score('orange');});await p.waitForTimeout(380);await p.screenshot({path:'test-results/original-ui/bot-goal.png'});
+ const layouts=[];
+ for(const [width,height]of [[1920,1080],[1440,900],[844,390],[390,844],[333,222]]){
+  await p.setViewportSize({width,height});
+  await p.evaluate(()=>{window.__game.hud.message('MAVERICK SCORED!','GOOOOOAL!','0 — 1','goal');});await p.waitForTimeout(350);
+  layouts.push(await p.evaluate(()=>{const t=document.querySelector('#message-title .arena-lettering').getBoundingClientRect(),a=document.querySelector('.goal-award').getBoundingClientRect();return{width:innerWidth,height:innerHeight,left:t.left,right:t.right,top:t.top,bottom:t.bottom,awardBottom:a.bottom};}));
+ }
+ check('Long scorer names remain centered and in bounds at desktop and mobile sizes',layouts.every(l=>l.left>=0&&l.right<=l.width&&l.bottom<l.height&&l.awardBottom<l.top&&Math.abs((l.left+l.right)/2-l.width/2)<1),layouts);
+ await p.evaluate(()=>{window.__game.hud.message('LION SCORED!','GOOOOOAL!','1 — 0','goal',true);});await p.waitForTimeout(380);
+ // Isolate the announcement at the reference's dimensions for visual comparison.
+ const comparison=await p.addStyleTag({content:'#hud>*:not(#center-message){visibility:hidden!important}'});
+ await p.screenshot({path:'test-results/original-ui/goal-small-v2.png'});await comparison.evaluate(e=>e.remove());
+ await p.setViewportSize({width:1440,height:900});
+ const flow=await p.evaluate(()=>{const g=window.__game;g.kickoff();const count={text:document.querySelector('#message-title').textContent,award:getComputedStyle(document.querySelector('.goal-award')).display};g.advance(3.1);const go=document.querySelector('#message-title').textContent;g.advance(1);const hidden=document.querySelector('#center-message').hidden;g.hud.toast('SHOT ON GOAL +10');return{count,go,hidden,toast:document.querySelector('#event-toast').textContent,paths:document.querySelectorAll('#event-toast .arena-lettering path').length};});
+ check('Countdown, GO and toast use Original, and the announcement clears for play',flow.count.text==='3'&&flow.count.award==='none'&&flow.go==='GO!'&&flow.hidden&&flow.toast==='SHOT ON GOAL +10'&&flow.paths>0,flow);
+ await p.emulateMedia({reducedMotion:'reduce'});
+ check('Reduced motion leaves the original announcement static',await p.evaluate(()=>{const h=window.__game.hud;h.message('YOU SCORED!','','','goal',true);return document.querySelector('#message-title').getAnimations().length===0;}));
+ await p.reload();await p.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));
+ check('Original preference also survives reload',await p.locator('#hud').getAttribute('data-text-style')==='original');
+ check('No browser errors',errors.length===0,errors);
+ await writeFile('test-results/original-ui/checks.json',JSON.stringify({results,errors},null,2));
+}finally{await browser.close();}

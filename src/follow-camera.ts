@@ -15,6 +15,10 @@ export class FollowCamera {
   look = new Vector3();
   private yaw = 0;
   private yawVelocity = 0;
+  private lookYaw = 0;
+  private lookVelocity = 0;
+  private lookWeight = 0;
+  private lookWeightVelocity = 0;
   private distance = 5;
   private distanceVelocity = 0;
   private mode = 0;
@@ -23,14 +27,24 @@ export class FollowCamera {
   private clearance = 20;
   private aim = new Quaternion();
   private matrix = new Matrix4();
-  update(camera: PerspectiveCamera, pos: Vector3, rotation: Quaternion, ball: Vector3, speed: number, ballCam: boolean, flipping: boolean, dt: number, reset: boolean, clear: (from: Vector3, to: Vector3) => number) {
+  update(camera: PerspectiveCamera, pos: Vector3, rotation: Quaternion, ball: Vector3, speed: number, ballCam: boolean, flipping: boolean, dt: number, reset: boolean, clear: (from: Vector3, to: Vector3) => number, lookInput = 0) {
     if (!reset && dt <= 0) return;
+    const look = Number.isFinite(lookInput) ? MathUtils.clamp(lookInput, -1, 1) : 0;
+    const targetLook = -look * Math.PI;
+    // Keep a signed offset instead of wrapping at PI: each stick direction
+    // travels through its own side and returns along that side on release.
+    const looking = Math.abs(look) >= .001 ? 1 : 0;
+    if (reset) { this.lookYaw = targetLook; this.lookWeight = looking; this.lookVelocity = this.lookWeightVelocity = 0; }
+    else {
+      [this.lookYaw, this.lookVelocity] = spring(this.lookYaw, this.lookVelocity, targetLook, 14, dt);
+      [this.lookWeight, this.lookWeightVelocity] = spring(this.lookWeight, this.lookWeightVelocity, looking, 14, dt);
+    }
     if (reset) { this.previousMode = ballCam; this.switchTime = 0; }
     else if (ballCam !== this.previousMode) { this.previousMode = ballCam; this.switchTime = .65; }
     const response = this.switchTime > 0 ? 2 : 1;
     this.switchTime = Math.max(0, this.switchTime - dt);
     const carForward = new Vector3(0, 0, -1).applyQuaternion(rotation); carForward.y = 0;
-    if (carForward.lengthSq() < .1 || flipping) carForward.copy(this.forward); else carForward.normalize();
+    if (carForward.lengthSq() < .1 || flipping) carForward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)); else carForward.normalize();
     const carYaw = Math.atan2(-carForward.x, -carForward.z), toBall = ball.clone().sub(pos);
     const planarDistance = Math.hypot(toBall.x, toBall.z);
     if (reset) { this.yaw = carYaw; this.mode = ballCam ? 1 : 0; this.yawVelocity = this.distanceVelocity = 0; }
@@ -111,7 +125,16 @@ export class FollowCamera {
       this.aim.slerp(targetRotation, Math.min(1 - Math.exp(-15 * response * dt), 6 * response * dt / Math.max(.001, angle)));
     }
     camera.quaternion.copy(this.aim);
-    this.look.copy(desired).add(new Vector3(0, 0, -1).applyQuaternion(this.aim).multiplyScalar(8));
+    // Keep the normal lens height, distance and FOV. Only its horizontal orbit
+    // and aim change; a held stick makes that orbit relative to the car.
+    if (this.lookWeight > .000001) {
+      const orbitYaw = this.lookYaw + shortest(carYaw - this.yaw) * this.lookWeight;
+      const orbit = new Quaternion().setFromAxisAngle(UP, orbitYaw);
+      camera.position.sub(pos).applyQuaternion(orbit).add(pos);
+      camera.quaternion.premultiply(orbit);
+      this.forward.applyQuaternion(orbit);
+    }
+    this.look.copy(camera.position).add(new Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(8));
     camera.fov = reset ? baseFov : MathUtils.damp(camera.fov, baseFov, 5 * response, dt);
     camera.updateProjectionMatrix();
   }

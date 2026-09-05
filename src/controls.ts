@@ -46,7 +46,7 @@ export class Controls {
       if (!e.repeat) {
         if (matches.some(a => a.id === 'jump')) this.jumpQueued = true;
         if (matches.some(a => a.category !== 'match')) this.onActivity();
-        for (const action of matches) if (action.category === 'match') this.onAction(action.id);
+        for (const action of matches) if (action.category === 'match' && !('hold' in action)) this.onAction(action.id);
       }
     });
     window.addEventListener('keyup', e => this.keys.delete(e.code));
@@ -62,6 +62,9 @@ export class Controls {
   private padValue(binding: PadBinding, deadzone = this.settings.deadzone) {
     if (!this.pad) return 0;
     if (binding.type === 'button') return Math.max(0, Math.min(1, this.pad.buttons[binding.index]?.value || 0));
+    // Raw controllers may use axis 2 for a trigger. Explicitly captured
+    // bindings still work there; only the stock right-stick mapping is gated.
+    if (binding.standardOnly && this.pad.mapping !== 'standard') return 0;
     const range = 1 - binding.rest * binding.direction;
     const value = ((this.pad.axes[binding.index] ?? binding.rest) - binding.rest) * binding.direction / Math.max(.01, range);
     return Math.max(0, Math.min(1, (value - deadzone) / (1 - deadzone)));
@@ -97,7 +100,7 @@ export class Controls {
     if (!this.padBlocked && !this.menu) {
       if (ACTIONS.some(a => a.category !== 'match' && this.settings.gamepad[a.id].some(p => this.padValue(p) > .1))) this.onActivity();
       if (actions.has('jump') && !this.previousActions.has('jump')) this.jumpQueued = true;
-      for (const action of ACTIONS) if (action.category === 'match' && actions.has(action.id) && !this.previousActions.has(action.id)) {
+      for (const action of ACTIONS) if (action.category === 'match' && !('hold' in action) && actions.has(action.id) && !this.previousActions.has(action.id)) {
         this.onAction(action.id);
         if (this.menu) break;
       }
@@ -124,6 +127,7 @@ export class Controls {
     const jump = this.jumpQueued; this.jumpQueued = false;
     return { ...emptyInput(), throttle: value('forward') - value('reverse'), steer: clamp((value('left') - value('right')) * this.settings.steeringSensitivity), pitch, yaw: modifier ? 0 : yaw, roll: clamp(directRoll + (modifier ? yaw : 0)), boost: value('boost') > .5, drift: value('drift') > .5, jump, jumpHeld: value('jump') > .5, dodgeForward: dodge ? -pitch : 0, dodgeSide: dodge ? clamp(yaw + directRoll) : 0 };
   }
+  cameraLook() { return this.menu || this.capture ? 0 : this.value('lookRight') - this.value('lookLeft'); }
   save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings)); this.saved = true; } catch { this.saved = false; }
     this.onChange();

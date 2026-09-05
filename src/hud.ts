@@ -2,6 +2,9 @@ import type { Controls } from './controls';
 import type { ActionId } from './bindings';
 import { BoostGauge } from './boost-gauge';
 import { scoreNumerals } from './score-numerals';
+import { arenaLettering, goalAward } from './arena-lettering';
+import './original-hud.css';
+export type TextStyle = 'original' | 'cartoon';
 const icons = {
   pause: '<path d="M8 5v14M16 5v14"/>',
   sound: '<path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/>',
@@ -18,14 +21,18 @@ export class HUD {
   private boostGauge: BoostGauge;
   private opponentBoostLevel = -1;
   private scoreAnimations = new Map<string, Animation[]>();
+  private messageAnimation?: Animation;
+  textStyle: TextStyle = 'original';
   constructor() {
     this.root = document.createElement('main'); this.root.id = 'hud'; document.querySelector('#app')!.append(this.root);
+    try { if (localStorage.getItem('champions-field.text-style') === 'cartoon') this.textStyle = 'cartoon'; } catch { /* Apply for this session. */ }
+    this.root.dataset.textStyle = this.textStyle;
     this.root.innerHTML = `
       <div class="vignette"></div>
       <header class="identity">${logo}<span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> <span id="lighting-label">NIGHT</span> <span>·</span> LOCAL MATCH</span></div></header>
-      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">${scoreNumerals('0')}</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">${scoreNumerals('5:00')}</strong><b class="practice-label">FREE PLAY</b></div><div class="team team-orange"><strong id="orange-score">${scoreNumerals('0')}</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
+      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">${scoreNumerals('0')}</strong><span class="team-label">YOU</span><span class="score-sheen-clip" aria-hidden="true"><i class="score-sheen"></i></span></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">${scoreNumerals('5:00')}</strong><b class="practice-label">FREE PLAY</b></div><div class="team team-orange"><strong id="orange-score">${scoreNumerals('0')}</strong><span class="team-label">MAVERICK</span><span class="score-sheen-clip" aria-hidden="true"><i class="score-sheen"></i></span></div></div><i id="overtime">OVERTIME</i></div>
       <nav class="top-actions" aria-label="Game settings"><span class="live-label"><i></i> LOCAL PLAY</span><button data-action="sound" aria-label="Toggle sound" title="Toggle sound (M)">${icon('sound')}</button><button data-action="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">${icon('expand')}</button><button data-action="pause" aria-label="Pause game" title="Pause (Esc)">${icon('pause')}</button></nav>
-      <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
+      <div id="center-message" class="center-message countdown">${goalAward}<span id="message-kicker"></span><h1 id="message-title" data-text="3"><span class="comic-face">3</span><span class="original-face">${arenaLettering('3')}</span></h1><p id="message-sub"></p></div>
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
       <div id="goal-flash"></div>
       <div id="bot-name" class="player-label orange" hidden><span id="opponent-boost" class="nameplate-boost" role="meter" aria-label="Maverick boost" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="opponent-boost-clip"><circle cx="12" cy="12" r="9.5"/></clipPath></defs><rect id="opponent-boost-fill" x="2.5" y="2.5" width="19" height="19" clip-path="url(#opponent-boost-clip)"/><circle class="nameplate-boost-outline" cx="12" cy="12" r="10"/></svg></span><span class="nameplate-name">MAVERICK</span></div>
@@ -55,17 +62,22 @@ export class HUD {
       const row = document.createElement('div'), label = document.createElement('span'), key = document.createElement('kbd');
       label.textContent = name; key.textContent = ids.map(id => controls.label(id)).join(' · '); row.append(label, key); list.append(row);
     }
-    if (this.el('center-message').classList.contains('ready')) {
-      const sub = this.el('message-sub'), key = document.createElement('kbd'); key.textContent = controls.label('forward').split(' / ')[0]; sub.replaceChildren(key, document.createTextNode(' DRIVE TO KICK OFF'));
-    }
   }
   el(id: string) { return document.getElementById(id)!; }
+  setTextStyle(style: TextStyle) {
+    this.textStyle = style; this.root.dataset.textStyle = style;
+    this.messageAnimation?.cancel();
+    try { localStorage.setItem('champions-field.text-style', style); return true; } catch { return false; }
+  }
   set(id: string, value: string | number) {
     const el = this.el(id), text = String(value);
     if (id === 'message-title' || id === 'event-toast') {
       let face = el.querySelector<HTMLElement>('.comic-face');
       if (!face) { face = document.createElement('span'); face.className = 'comic-face'; el.replaceChildren(face); }
       if (face.textContent !== text) face.textContent = text;
+      let original = el.querySelector<HTMLElement>('.original-face');
+      if (!original) { original = document.createElement('span'); original.className = 'original-face'; el.append(original); }
+      if (el.dataset.text !== text || !original.childElementCount) original.innerHTML = arenaLettering(text);
       el.dataset.text = text;
     } else if (el.textContent !== text) {
       const scored = (id === 'blue-score' || id === 'orange-score') && Number(text) > Number(el.textContent);
@@ -81,10 +93,14 @@ export class HUD {
     }
   }
   ready() { this.el('loading').remove(); }
-  message(title: string, kicker = '', sub = '', style = '') {
+  message(title: string, kicker = '', sub = '', style = '', award = false) {
     const el = this.el('center-message'); el.className = `center-message ${style}`; el.hidden = !title;
+    el.dataset.goalAward = String(style === 'goal' && award);
     this.set('message-title', title); this.set('message-kicker', kicker); this.el('message-sub').innerHTML = sub;
-    if (title && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.el('message-title').animate([
+    this.messageAnimation?.cancel();
+    if (title && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.messageAnimation = this.el('message-title').animate(this.textStyle === 'original' ? [
+      { opacity: 0, filter: 'blur(2px)' }, { opacity: 1, filter: 'blur(0px)' },
+    ] : [
       { transform: 'rotate(-3deg) scale(.65)', opacity: 0 },
       { transform: 'rotate(-3deg) scale(1.09)', opacity: 1, offset: .65 },
       { transform: 'rotate(-3deg) scale(1)', opacity: 1 },

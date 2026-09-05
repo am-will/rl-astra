@@ -32,7 +32,7 @@ export class Game {
     this.hud.onAction = action => this.action(action);
     this.controlsMenu = new ControlsMenu(this.controls, this.hud.root);
     this.controlsMenu.onClose = () => this.action('close-bindings');
-    this.visualSettings = new VisualSettings(this.view, this.hud.root);
+    this.visualSettings = new VisualSettings(this.view, this.hud);
     this.visualSettings.onClose = () => this.action('close-visuals');
     this.visualSettings.onChange = () => { this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT'); this.hud.camera(this.view.ballCam); };
     this.controls.onAction = action => this.action(action);
@@ -56,7 +56,7 @@ export class Game {
     };
     this.hud.bindings(this.controls);
     this.physics.onHit = (position, speed, player) => {
-      this.hits++; this.view.effects.burst(position, player ? 0xa6dfff : 0xffc080, 18 + Math.floor(speed), 6);
+      this.hits++;
       this.view.audio.hit(speed, ...this.soundPosition(position)); this.view.shake = Math.min(.65, speed / 50);
       if (player && speed > 18) this.hud.toast('POWER HIT  +20');
     };
@@ -78,7 +78,7 @@ export class Game {
     if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = this;
     requestAnimationFrame(t => this.frame(t));
   }
-  kickoff() { this.view.audio.reset(); this.view.effects.explosion.reset(); this.view.effects.demolitions.reset(); this.goalBlastPending = false; if (this.practice) { this.phase = 'playing'; this.phaseTime = 0; this.hud.message(''); return; } this.phase = 'countdown'; this.phaseTime = 3; this.lastCountdown = 0; this.hud.message('3', 'GET READY', 'CHAMPIONS FIELD', 'countdown'); }
+  kickoff() { this.view.audio.reset(); this.view.effects.explosion.reset(); this.view.effects.demolitions.reset(); this.goalBlastPending = false; if (this.practice) { this.phase = 'playing'; this.phaseTime = 0; this.hud.message(''); return; } this.phase = 'countdown'; this.phaseTime = 3; this.lastCountdown = 0; this.hud.message('3', '', '', 'countdown'); }
   action(action: string) {
     this.view.audio.init();
     if (action === 'camera') this.view.audio.menu();
@@ -119,7 +119,7 @@ export class Game {
     this.view.effects.explosion.reset();
     this.view.effects.demolitions.reset(); this.goalBlastPending = false;
     this.blue = this.orange = 0; this.remaining = this.practice ? 0 : MATCH_LENGTH; this.overtime = false; this.phase = this.practice ? 'playing' : 'ready'; this.paused = false;
-    this.physics.reset(); this.view.ballCam = true; this.hud.camera(true); this.view.cameraReady = false; this.hud.pause(false); this.hud.message(this.practice ? '' : 'MAKE YOUR PLAY.', 'THE STAGE IS YOURS', '', 'ready'); this.hud.bindings(this.controls);
+    this.physics.reset(); this.view.ballCam = true; this.hud.camera(true); this.view.cameraReady = false; this.hud.pause(false); this.hud.message(this.practice ? '' : '3', '', '', 'countdown'); this.hud.bindings(this.controls);
   }
   soundPosition(position: Vector3): [number, number] {
     const delta = position.clone().sub(new Vector3().copy(this.physics.player.body.translation())), distance = delta.length();
@@ -148,7 +148,7 @@ export class Game {
         // Let the motor rev while the kickoff lock still blocks driving/boost.
         this.physics.player.throttle = input.boost ? 1 : input.throttle;
         this.phaseTime -= STEP; const number = Math.ceil(this.phaseTime);
-        if (number !== this.lastCountdown && number > 0) { this.hud.message(String(number), 'GET READY', 'CHAMPIONS FIELD', 'countdown'); this.view.audio.countdown(false); this.lastCountdown = number; }
+        if (number !== this.lastCountdown && number > 0) { this.hud.message(String(number), '', '', 'countdown'); this.view.audio.countdown(false); this.lastCountdown = number; }
         if (this.phaseTime <= 0) { this.phase = 'playing'; this.hud.message('GO!', '', '', 'countdown'); this.phaseTime = .85; this.view.audio.countdown(true); }
       }
     } else if (this.phase === 'playing') {
@@ -182,7 +182,7 @@ export class Game {
     this.goalBlastPending = true;
     this.celebration.copy(this.physics.ball.translation());
     this.physics.ball.setEnabled(false);
-    this.hud.message(team === 'blue' ? 'YOU SCORED!' : `${this.physics.botEnabled ? 'MAVERICK' : 'ORANGE'} SCORED!`, 'GOOOOOAL!', `${this.blue} <span style="opacity:.5">—</span> ${this.orange}`, 'goal');
+    this.hud.message(team === 'blue' ? 'YOU SCORED!' : `${this.physics.botEnabled ? 'MAVERICK' : 'ORANGE'} SCORED!`, 'GOOOOOAL!', `${this.blue} <span style="opacity:.5">—</span> ${this.orange}`, 'goal', team === 'blue');
     this.view.effects.goal(this.celebration, team === 'blue' ? BLUE : ORANGE); this.view.audio.goal(); this.view.shake = 1.8;
     const flash = this.hud.el('goal-flash'); flash.classList.remove('flash'); void flash.offsetWidth; flash.classList.add('flash');
   }
@@ -200,6 +200,7 @@ export class Game {
       if (input.jump && this.accumulator < STEP) this.controls.restoreJump();
       while (this.accumulator >= STEP) { this.tick(input); input.jump = false; this.accumulator -= STEP; }
     } else this.accumulator = 0;
+    this.view.cameraLook = frozen ? 0 : this.controls.cameraLook();
     this.view.update(frozen ? 0 : dt, this.phase, this.celebration, frozen ? 1 : this.accumulator / STEP);
     this.view.draw();
     const car = this.physics.player;

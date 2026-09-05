@@ -41,6 +41,7 @@ export function createCarModel(team: 'blue' | 'orange'): CarModel {
   const root = new T.Group(), body = new T.Group(); root.add(body);
   const color = team === 'blue' ? BLUE : ORANGE;
   const paint = new T.MeshPhysicalMaterial({ color, metalness: .6, roughness: .26, clearcoat: 1, clearcoatRoughness: .15 });
+  paint.name = 'Car_Body';
   const dark = material(0x111821, .65, .4), rubber = material(0x101216, .05, .86), metal = material(0x78848c, .87, .25), stripe = material(0xe8f5ff, .35, .26);
   const glass = new T.MeshPhysicalMaterial({ color: 0x173c51, metalness: .68, roughness: .1, clearcoat: 1 });
   const headlight = new T.MeshStandardMaterial({ color: 0xe4faff, emissive: 0xb5e6ff, emissiveIntensity: 3 });
