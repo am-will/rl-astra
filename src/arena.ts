@@ -156,18 +156,22 @@ function horizontalPolygon(contour: T.Vector2[], height: number) {
   geometry.computeVertexNormals(); return geometry;
 }
 
-export function honeycombMaterial(opacity = .22, team = 0) {
+export function honeycombMaterial(opacity = .22, team = 0, backOpacity = opacity) {
   return new T.ShaderMaterial({
     transparent: true, depthWrite: false, side: T.DoubleSide,
-    uniforms: { opacity: { value: opacity }, team: { value: team }, visibility: { value: 1 } },
+    uniforms: { opacity: { value: opacity }, backOpacity: { value: backOpacity }, team: { value: team }, visibility: { value: 1 } },
     vertexShader: `varying vec2 vUv; varying vec3 vWorld; varying float vDistance;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vec4 mv=viewMatrix*w;vDistance=length(mv.xyz);gl_Position=projectionMatrix*mv;}`,
-    fragmentShader: `varying vec2 vUv; varying vec3 vWorld; varying float vDistance; uniform float opacity;uniform float team;uniform float visibility;
+    fragmentShader: `varying vec2 vUv; varying vec3 vWorld; varying float vDistance; uniform float opacity;uniform float backOpacity;uniform float team;uniform float visibility;
       void main(){vec2 p=vUv*(team!=0.?1.45:.85);vec2 tile=vec2(1.,1.7320508);vec2 a=mod(p,tile)-tile*.5;vec2 b=mod(p-tile*.5,tile)-tile*.5;vec2 q=dot(a,a)<dot(b,b)?a:b;
       float edge=.5-max(abs(q.x),dot(abs(q),vec2(.5,.8660254)));float aa=max(fwidth(edge),.002);
       float line=1.-smoothstep(.009,.009+aa,edge);float nearFade=smoothstep(1.5,4.,vDistance);
       vec3 blue=vec3(.13,.55,1.);vec3 orange=vec3(1.,.47,.13);vec3 tint=mix(orange,blue,smoothstep(-9.,9.,vWorld.z));
       tint=mix(vec3(.42,.58,.72),tint,.35);if(team!=0.)tint=team>0.?blue:orange;
-      float alpha=(line*opacity+.004)*nearFade*visibility;gl_FragColor=vec4(tint*1.5,alpha);}`,
+      // Outside views keep the same faint grid as ramp backs; only inner faces
+      // receive the wall-proximity fade. The lens-distance fade still applies.
+      float faceOpacity=gl_FrontFacing?opacity:backOpacity;
+      float faceVisibility=gl_FrontFacing?visibility:1.;
+      float alpha=(line*faceOpacity+.004)*nearFade*faceVisibility;gl_FragColor=vec4(tint*1.5,alpha);}`,
   });
 }

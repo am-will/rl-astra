@@ -135,7 +135,7 @@ export class Stadium {
     field.rotation.x = -Math.PI / 2; field.receiveShadow = true; field.name = 'textured-playing-field'; scene.add(field);
     this.grass = new UltraGrass(scene, fieldMat.map!, pads);
     const apron = box(architecture, [110, 1, 130], [0, -.55, 0], material(0x182936)); apron.receiveShadow = true;
-    const glass = honeycombMaterial(.045);
+    const glass = honeycombMaterial(.045, 0, .07);
     this.wallMaterial = glass;
     const { goalWidth: g, width: w, length: l, goalDepth: d } = FIELD;
     // Tiles are solid from the field; the reverse face is a faint cage so a
