@@ -7,7 +7,7 @@ import { arenaSurfaces, sideBoundary, honeycombMaterial } from './arena';
 import { createLargeBoostPad, createSmallBoostPad } from './boost-pad';
 import { createGoalFrame } from './goal-frame';
 import { UltraGrass } from './ultra-grass';
-import { rampMaterial, decorateRamp } from './ramp-decoration';
+import { createRampMaterials, decorateRamp } from './ramp-decoration';
 import { StadiumPresentation } from './stadium-presentation';
 
 function turfTexture() {
@@ -125,7 +125,6 @@ export class Stadium {
     const orangeGlow = this.presentation.lightMaterial(ORANGE, 3.4);
     const whiteGlow = new T.MeshStandardMaterial({ color: 0xdaf4ff, emissive: 0xc2eaff, emissiveIntensity: 3.2 });
     const screenMat = this.presentation.displayMaterial(), ribbonMat = this.presentation.displayMaterial(true);
-    const adMaterials = new Map<string, T.MeshLambertMaterial>();
     const flagMat = this.presentation.flagMaterial(labelTexture('RLCS', '#f1d795', '#163351', 256, 512));
     const fieldMat = new T.MeshStandardMaterial({ map: turfTexture(), bumpMap: grassDetail(), bumpScale: .085, roughness: .94, metalness: 0 });
     fieldMat.onBeforeCompile = shader => {
@@ -138,17 +137,17 @@ export class Stadium {
     const glass = honeycombMaterial(.045, 0, .07);
     this.wallMaterial = glass;
     const { goalWidth: g, width: w, length: l, goalDepth: d } = FIELD;
-    // Tiles are solid from the field; the reverse face is a faint cage so a
+    // Ramp panels are solid from the field; the reverse face is a faint cage so a
     // camera outside the arena can still frame both the car and the ball.
-    const rampMat = rampMaterial();
+    const rampMaterials = createRampMaterials();
     const rampBack = honeycombMaterial(.07); rampBack.side = T.BackSide;
     const netMats = [honeycombMaterial(.065, 1), honeycombMaterial(.065, -1)];
     for (const surface of arenaSurfaces()) {
       const goalIndex = surface.team > 0 ? 0 : 1;
-      const mat = surface.kind === 'ramp' ? rampMat : surface.kind.startsWith('goal-') ? netMats[goalIndex] : glass;
+      const mat = surface.kind === 'ramp' ? rampMaterials.surface : surface.kind.startsWith('goal-') ? netMats[goalIndex] : glass;
       const mesh = new T.Mesh(surface.geometry, mat); mesh.name = `arena-${surface.kind}`; mesh.receiveShadow = surface.kind === 'ramp'; scene.add(mesh);
       if (surface.kind === 'ramp') {
-        decorateRamp(scene, surface.geometry);
+        decorateRamp(scene, surface.geometry, rampMaterials);
         const back = new T.Mesh(surface.geometry, rampBack); back.name = 'arena-ramp-transparent-back'; scene.add(back);
       }
     }
@@ -165,13 +164,6 @@ export class Stadium {
       const teamMat = s === 1 ? blueGlow : orangeGlow, teamColor = s === 1 ? BLUE : ORANGE;
       for (let z = -33; z <= 33; z += 11) {
         box(architecture, [.17, 18, .2], [s * (w + .2), 9, z], structural);
-        const label = z % 22 === 0 ? 'ROCKET LEAGUE' : 'CHAMPIONS FIELD', key = `${label}:${z > 0}`;
-        let adMat = adMaterials.get(key);
-        if (!adMat) {
-          const texture = labelTexture(label, '#c6e7f4', z > 0 ? '#123964' : '#684328');
-          adMat = new T.MeshLambertMaterial({ name: 'stadium-static-advertising', map: texture, reflectivity: 0 }); adMaterials.set(key, adMat);
-        }
-        const ad = new T.Mesh(new T.PlaneGeometry(10.65, 1.25), adMat); ad.name = 'stadium-static-ad'; ad.position.set(s * (w - .08), 3.65, z); ad.rotation.y = -s * Math.PI / 2; scene.add(ad); fadeNearCamera(ad);
       }
       for (let row = 0; row < 13; row++) {
         box(architecture, [2.4, .8, 119 + row * .55], [s * (43 + row * 1.45), 3 + row * .87, 0], row % 4 === 0 ? concrete : seatMat);

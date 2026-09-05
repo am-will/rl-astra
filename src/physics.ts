@@ -146,6 +146,8 @@ export class Physics {
     body.resetForces(true); body.resetTorques(true);
     let contacts = 0, ballContacts = 0;
     const normal = new Vector3();
+    let suspensionCompression = 0;
+    const suspensionForces: Vector3[] = [];
     if (car.blastTime <= 0) for (const x of [-.375, .375]) for (const z of [-.475, .475]) {
       const origin = new Vector3(x, -.03, z).applyQuaternion(q).add(pos);
       const ray = new RAPIER.Ray(origin, up.clone().negate());
@@ -154,16 +156,31 @@ export class Physics {
       if (hit && hit.timeOfImpact < .425 && v3(hit.normal).dot(up) > .25) {
         contacts++; normal.add(v3(hit.normal));
         const compression = .305 - hit.timeOfImpact;
+        suspensionCompression += compression;
         // Suspension pushes the chassis away from the surface; it cannot pull
         // the car back onto a ceiling as an extended spring would.
         const contactNormal = v3(hit.normal);
         const support = Math.max(0, 180 * CAR.gravity / 4 * Math.max(0, contactNormal.y) + compression * 10000 - velocity.dot(contactNormal) * 620);
-        if (car.jumpTime <= 0 && car.flipTime <= 0 && !input.jump) body.addForce(contactNormal.multiplyScalar(support), true);
+        if (car.jumpTime <= 0 && car.flipTime <= 0 && !input.jump) suspensionForces.push(contactNormal.multiplyScalar(support));
       }
     }
+    const contactNormal = normal.clone().normalize();
+    // Keep an established wheel contact at its rest height through a curve.
+    // Independent tire springs otherwise kick the chassis out of contact at
+    // speed, particularly when diagonal tires cross different ramp facets.
+    const surfaceRide = wasGrounded && !input.jump && car.jumpTime <= 0 && car.flipTime <= 0
+      && ballContacts === 0 && contacts > 0 && car.groundNormal.dot(contactNormal) > .8
+      && (contactNormal.y < .9999 || car.groundNormal.y < .9999);
+    // Blend back to free suspension over the last eight degrees of the roof
+    // curve. Flat-ceiling contact must separate under gravity, even at speed.
+    const rideWeight = surfaceRide ? MathUtils.smoothstep(contactNormal.y, -1, -.99) : 0;
+    for (const force of suspensionForces) body.addForce(force.multiplyScalar(1 - rideWeight), true);
     car.wheels = contacts;
     if (contacts >= 3 && car.flipTime > 0 && up.y > .65 && car.airTime > .08) car.flipTime = 0;
-    car.grounded = contacts >= 2 && car.jumpTime <= 0 && car.flipTime <= 0;
+    // A diagonal ramp exit can leave just one tire supporting the chassis.
+    // Keep an existing ride continuous until every tire releases; landing
+    // from the air still needs two contacts, and jumps/dodges release normally.
+    car.grounded = (contacts >= 2 || (contacts === 1 && wasGrounded)) && car.jumpTime <= 0 && car.flipTime <= 0;
     if (car.grounded && !wasGrounded && car.airTime > .1) {
       const impact = Math.max(0, -velocity.dot(normal.clone().normalize()));
       if (impact > 1.5) this.onLand(car, impact);
@@ -201,7 +218,21 @@ export class Physics {
       // projecting it away at each ramp facet. Landing/jumping never converts
       // impact velocity into forward speed.
       if (wasGrounded && !input.jump && ballContacts === 0 && car.groundNormal.dot(normal) > .8) {
-        velocity.applyQuaternion(new Quaternion().setFromUnitVectors(car.groundNormal, normal));
+        const transport = new Quaternion().setFromUnitVectors(car.groundNormal, normal);
+        velocity.applyQuaternion(transport);
+        // Carry the tire frame through the same turn as its momentum. Merely
+        // projecting the old heading onto the new surface creates sideways
+        // slip on diagonal entries, while a lagging chassis scrapes the ramp.
+        q.premultiply(transport);
+        up.applyQuaternion(transport); forward.applyQuaternion(transport); right.applyQuaternion(transport);
+      }
+      if (rideWeight > 0) {
+        // Correct only supported wheel compression and normal drift. The
+        // transported tangential velocity still carries the car around the
+        // curve, with gravity slowing climbs and accelerating descents.
+        const correction = MathUtils.clamp(suspensionCompression / contacts * .65, -.06, .06) * rideWeight;
+        body.setTranslation(pos.clone().addScaledVector(normal, correction), true);
+        velocity.addScaledVector(normal, -velocity.dot(normal) * rideWeight);
       }
       car.groundNormal.copy(normal);
       const heading = forward.clone().projectOnPlane(normal).normalize();

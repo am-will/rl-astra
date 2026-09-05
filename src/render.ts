@@ -17,6 +17,7 @@ import { createBlastPass } from './blast-pass';
 import { FollowCamera } from './follow-camera';
 import { RocketBoost } from './rocket-boost';
 import { SpeedTrails } from './speed-trails';
+import { SupersonicStreaks } from './supersonic-streaks';
 import { FlameSmoke } from './flame-smoke';
 import { ExhaustBackfire } from './exhaust-backfire';
 import { BOOST_OUTLET } from './octane-outlets';
@@ -54,6 +55,7 @@ export class GameRenderer {
   paintPreviewAngle: 'front' | 'side' | 'rear' = 'front';
   private lastPaintFrame = performance.now();
   speedTrails: [SpeedTrails, SpeedTrails];
+  supersonicStreaks: SupersonicStreaks;
   turfDebris: [TurfDebris, TurfDebris];
   audio = new GameAudio();
   ballCam = true;
@@ -120,6 +122,7 @@ export class GameRenderer {
     this.infernos = [new FlameSmoke(this.scene), new FlameSmoke(this.scene)];
     this.exhausts = [new ExhaustBackfire(this.scene), new ExhaustBackfire(this.scene)];
     this.speedTrails = [new SpeedTrails(this.scene), new SpeedTrails(this.scene, true)];
+    this.supersonicStreaks = new SupersonicStreaks(this.scene);
     this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
     this.turfDebris = [new TurfDebris(this.scene), new TurfDebris(this.scene)];
     this.turfDebris[0].configureWheels(this.player); this.turfDebris[1].configureWheels(this.bot);
@@ -186,7 +189,7 @@ export class GameRenderer {
       this.update(0, 'ready');
     }
   }
-  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); }
+  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); this.supersonicStreaks.resize(innerWidth, innerHeight); }
   toggleQuality() { const modes: QualityLevel[] = ['performance', 'high', 'ultra']; this.setQuality(modes[(modes.indexOf(this.qualityLevel) + 1) % modes.length]); }
   setQuality(level: QualityLevel) {
     this.qualityLevel = level;
@@ -235,7 +238,7 @@ export class GameRenderer {
     this.boosts[index].update(model.root.position, model.root.quaternion, velocity, active && classic, dt);
     this.boosts[index].root.visible &&= classic;
     this.infernos[index].update(model.root.position, model.root.quaternion, velocity, active && this.boostStyle === 'inferno', dt, this.camera);
-    this.speedTrails[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, car.speed, car.supersonic, model.root.visible && (car !== this.physics.bot || this.physics.botEnabled), dt);
+    this.speedTrails[index].update(model.root.position, model.root.quaternion, car.speed, car.supersonic, car.grounded, enabled, dt);
     if (active && classic && dt > 0 && Math.random() < dt * 35) {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
       this.effects.emit(new T.Vector3((Math.random() < .5 ? -1 : 1) * BOOST_OUTLET.x, BOOST_OUTLET.y + (Math.random() - .5) * BOOST_OUTLET.height, BOOST_OUTLET.z + .6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
@@ -286,6 +289,8 @@ export class GameRenderer {
       this.camera.lookAt(target);
     }
     this.camera.updateMatrixWorld();
+    this.supersonicStreaks.update(this.camera, pos, new T.Vector3().copy(car.body.linvel()), car.supersonic,
+      this.player.root.visible && !this.paintPreview && (phase === 'playing' || phase === 'goal'), dt);
     this.effects.demolitions.updateCamera(this.camera.position);
     this.stadium.updateCamera(this.camera.position);
     this.stadium.grass.update(this.camera.position, this.player.root.position, this.time);

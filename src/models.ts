@@ -21,6 +21,14 @@ export function detailedCar(source: T.Group, team: 'blue' | 'orange'): CarModel 
   baked.traverse(obj => {
     if (!(obj instanceof T.Mesh)) return;
     const geometry = obj.geometry.clone().applyMatrix4(obj.matrixWorld).applyMatrix4(transform);
+    // Baking mirrored wheels removes the mesh transform that normally reverses
+    // face culling. Reverse their triangles so the tire sidewalls face outward.
+    if (obj.matrixWorld.determinant() < 0) {
+      const index = geometry.getIndex();
+      const indices = Array.from({ length: index?.count ?? geometry.getAttribute('position').count }, (_, i) => index ? index.getX(i) : i);
+      for (let i = 0; i < indices.length; i += 3) [indices[i], indices[i + 2]] = [indices[i + 2], indices[i]];
+      geometry.setIndex(indices);
+    }
     const original = obj.material as T.MeshStandardMaterial;
     const mat = new T.MeshPhysicalMaterial({ name: original.name, color: original.color, map: original.map, normalMap: original.normalMap,
       metalnessMap: original.metalnessMap, roughnessMap: original.roughnessMap, metalness: original.metalness, roughness: original.roughness });

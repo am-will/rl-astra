@@ -10,13 +10,28 @@ export class OctaneLighting {
   private heat = 0;
   private load = 0;
   private exhaustHeat = 0;
-  private exhaustInterior = new T.MeshStandardMaterial({ color: 0x030405, roughness: 1, metalness: 0, envMapIntensity: 0, emissive: 0xff1202, emissiveIntensity: 0 });
-  private exhaustRim = new T.MeshStandardMaterial({ color: 0x292421, roughness: .65, metalness: .35, envMapIntensity: .3, emissive: 0xff2806, emissiveIntensity: 0 });
+  private exhaustInterior = new T.MeshStandardMaterial({ color: 0x030405, roughness: 1, metalness: 0, envMapIntensity: 0, emissive: 0xff0801, emissiveIntensity: 0 });
+  private exhaustRim = new T.MeshStandardMaterial({ color: 0x292421, roughness: .65, metalness: .35, envMapIntensity: .3, emissive: 0xff1002, emissiveIntensity: 0 });
   private uniforms = { engineColor: { value: this.color }, engineTime: { value: 0 }, engineHeat: { value: 0 }, engineLoad: { value: 0 } };
 
   constructor(root: T.Group, color: T.ColorRepresentation, fallback = false, tailMaterial?: T.MeshStandardMaterial) {
     this.color.set(color);
     this.exhaustOutlet = fallback ? { x: .255, y: .03, z: .8, width: .12, height: .12 } : EXHAUST_OUTLET;
+    for (const [material, rim] of [[this.exhaustInterior, false], [this.exhaustRim, true]] as const) {
+      material.onBeforeCompile = shader => {
+        shader.vertexShader = 'varying vec2 exhaustUv;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nexhaustUv=uv;');
+        shader.fragmentShader = 'varying vec2 exhaustUv;\n' + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          float radius=length(exhaustUv-.5)*2.;
+          ${rim ? `float angle=atan(exhaustUv.y-.5,exhaustUv.x-.5);
+            float hotEdge=smoothstep(.76,.84,radius)*(1.-smoothstep(.88,1.06,radius));
+            totalEmissiveRadiance*=(.18+.82*hotEdge)*(.82+.1*sin(angle*7.+radius*21.)+.06*sin(angle*19.));`
+          : 'totalEmissiveRadiance*=pow(smoothstep(.2,.97,radius),2.)*.6;'}
+        `);
+      };
+      material.customProgramCacheKey = () => rim ? 'octane-hot-exhaust-rim' : 'octane-hot-exhaust-interior';
+    }
     const material = new T.MeshStandardMaterial({ color: 0x131820, roughness: .24, metalness: .2 });
     material.name = 'Octane_Engine_Core';
     material.onBeforeCompile = shader => {

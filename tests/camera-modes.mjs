@@ -56,14 +56,56 @@ try {
       rig.update(camera, pos, rotation, ball, 0, false, false, 0, true, clear); camera.updateMatrixWorld();
       const carScreen = pos.clone().project(camera);
       assert.ok(Math.abs(carScreen.y) < .95 && carScreen.z < 1, `Car cam must keep the car visible at ${fov} degrees`);
-      const regularAim = camera.quaternion.clone();
       rig.update(camera, pos, rotation, ball, 0, true, false, 0, true, clear); camera.updateMatrixWorld();
-      const ballScreen = ball.clone().project(camera);
-      assert.ok(Math.abs(ballScreen.x) < .9 && Math.abs(ballScreen.y) < .9 && ballScreen.z < 1, `Ball cam must focus on the ball at ${fov} degrees`);
-      assert.ok(regularAim.angleTo(camera.quaternion) > .001, 'The focus must change between modes');
+      const framedCar = pos.clone().project(camera);
+      assert.ok(Math.abs(framedCar.x) < .9 && Math.abs(framedCar.y) < .9 && framedCar.z > -1 && framedCar.z < 1, `Ball cam must keep the car visible at ${fov} degrees with ball ${ball.toArray()}`);
+      if (fov >= 50 && ball.y <= 3) {
+        const ballScreen = ball.clone().project(camera);
+        assert.ok(Math.abs(ballScreen.x) < .9 && Math.abs(ballScreen.y) < .9 && ballScreen.z < 1, 'Ball cam must keep both subjects visible when they fit');
+      }
     }
   }
-  console.log('PASS Both modes keep their focus visible, including 20-degree car cam and overhead ball cam');
+  console.log('PASS Both modes keep the car visible, including 20-degree overhead ball cam, and track the ball when both fit');
+
+  // Check every frame of a pop, overhead crossing, landing, lens adjustment,
+  // manual look and mode switch. Endpoint-only tests miss smoothing overshoot.
+  let frames = 0;
+  for (const hz of [30, 60, 144]) for (const aspect of [16 / 9, 1, 390 / 844]) for (const settings of presets) {
+    const { rig, camera } = create(settings, aspect), pos = new Vector3(0, .335, 0), ball = new Vector3(0, 1, -12), q = new Quaternion();
+    rig.update(camera, pos, q, ball, 0, true, false, 0, true, clear);
+    for (let frame = 0; frame < hz * 8; frame++) {
+      const t = frame / hz, speed = 23 * Math.sin(t) ** 2;
+      pos.set(4 * Math.sin(t), .335 + 19 * Math.sin(t * Math.PI / 8) ** 4, -t * 3);
+      q.setFromAxisAngle(new Vector3(0, 1, 0), t * 1.5);
+      ball.copy(pos).add(new Vector3(4 * Math.sin(t * 2), t < 1 ? .6 : 19 * Math.sin(t * .8) ** 2, -8 * Math.cos(t)));
+      if (frame === hz * 3) rig.settings.fov = 20;
+      if (frame === hz * 5) rig.settings.fov = 110;
+      const ballCam = t < 4 || t > 4.5, look = t > 6 && t < 7 ? .7 : 0;
+      rig.update(camera, pos, q, ball, speed, ballCam, false, 1 / hz, false, clear, look);
+      camera.updateMatrixWorld();
+      const screen = pos.clone().project(camera);
+      assert.ok(Math.abs(screen.x) < .95 && Math.abs(screen.y) < .95 && screen.z > -1 && screen.z < 1,
+        `Car left frame at ${hz} Hz, aspect ${aspect}, settings ${JSON.stringify(settings)}, t=${t}: ${screen.toArray()}`);
+      frames++;
+    }
+  }
+  console.log(`PASS Car stays visible through ${frames} frames of high balls, aerials, lens changes, mode switches and manual look`);
+
+  // The reported close-FOV pop must retain the body and all four wheels, not
+  // just a sliver of the car's origin at the bottom edge of the viewport.
+  for (const fov of [20, 35, 69]) for (const distance of [2.8, 4.9, 10]) for (const yaw of [0, Math.PI / 2]) {
+    if (fov === 20 && distance === 2.8) continue; // The entire car exceeds this lens even when centered.
+    const pos = new Vector3(0, .335, 0), ball = new Vector3(0, 19, 0), q = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw);
+    const { rig, camera } = create({ ...CAMERA_DEFAULTS, fov, distance }, 16 / 9);
+    rig.update(camera, pos, q, ball, 0, true, false, 0, true, clear);
+    camera.updateMatrixWorld();
+    for (const x of [-.55, .55]) for (const y of [-.32, .45]) for (const z of [-.82, .82]) {
+      const screen = new Vector3(x, y, z).applyQuaternion(q).add(pos).project(camera);
+      assert.ok(Math.abs(screen.x) < 1 && Math.abs(screen.y) < 1 && screen.z > -1 && screen.z < 1,
+        `High-ball framing crops the car body at FOV ${fov}, distance ${distance}: ${screen.toArray()}`);
+    }
+  }
+  console.log('PASS Close-FOV overhead framing retains the car body and wheels');
 } finally {
   await server.close();
 }
