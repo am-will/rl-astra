@@ -2,6 +2,7 @@ import * as T from 'three';
 import type { CarModel } from './assets';
 import type { Car, Pad } from './physics';
 import { FIELD } from './config';
+import { TireSmoke } from './tire-smoke';
 
 const CAPACITY = 192;
 interface Clump { life: number; position: T.Vector3; velocity: T.Vector3; rotation: T.Vector3; spin: T.Vector3; scale: T.Vector3; }
@@ -32,6 +33,7 @@ function onGrass(point: T.Vector3, pads: Pad[]) {
 /** Short-lived pieces of turf lifted by tires, with no persistent surface marks. */
 export class TurfDebris {
   mesh: T.InstancedMesh;
+  smoke: TireSmoke;
   private pool: Clump[] = Array.from({ length: CAPACITY }, () => ({ life: 0, position: new T.Vector3(), velocity: new T.Vector3(), rotation: new T.Vector3(), spin: new T.Vector3(), scale: new T.Vector3() }));
   private wheels: T.Vector3[] = [];
   private previous = new T.Vector3();
@@ -42,6 +44,7 @@ export class TurfDebris {
   private dummy = new T.Object3D();
 
   constructor(scene: T.Scene) {
+    this.smoke = new TireSmoke(scene);
     this.mesh = new T.InstancedMesh(clumpGeometry(), new T.MeshStandardMaterial({ vertexColors: true, roughness: .98, side: T.DoubleSide }), CAPACITY);
     this.mesh.name = 'tire-turf-debris'; this.mesh.count = 0; this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); scene.add(this.mesh);
@@ -61,7 +64,7 @@ export class TurfDebris {
     this.reset();
   }
 
-  reset() { for (const p of this.pool) p.life = 0; this.mesh.count = 0; this.credit = 0; this.ready = false; }
+  reset() { this.smoke.reset(); for (const p of this.pool) p.life = 0; this.mesh.count = 0; this.credit = 0; this.ready = false; }
 
   update(model: CarModel, car: Car, pads: Pad[], dt: number, enabled: boolean) {
     const position = model.root.position;
@@ -74,6 +77,7 @@ export class TurfDebris {
     const slip = Math.min(1, Math.abs(velocity.dot(right)) / 7);
     const disturbance = Math.min(1, Math.abs(car.steer) * .5 + slip * .7 + (car.drifting ? .65 : 0));
     const contacts = car.grounded && car.groundNormal.y > .95 ? this.wheels.map(p => p.clone().multiply(model.root.scale).applyQuaternion(model.root.quaternion).add(position)).filter(p => onGrass(p, pads)) : [];
+    this.smoke.update(contacts.filter(p => p.clone().sub(position).dot(forward) < 0), velocity, car.drifting ? T.MathUtils.smoothstep(car.speed, 2, 9) * (.55 + slip * .45) : 0, elapsed);
     const rate = contacts.length ? T.MathUtils.smoothstep(car.speed, 1, 8) * (5 + disturbance * 48) : 0;
     if (!rate) this.credit = 0;
     this.credit += rate * elapsed;
