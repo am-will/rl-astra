@@ -6,9 +6,9 @@ const results=[],errors=[];const check=(name,pass,detail)=>{assert.ok(pass,`${na
 try{
  const p=await browser.newPage({viewport:{width:1440,height:900}});p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await p.goto('http://127.0.0.1:5179');await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
- const ui=await p.evaluate(()=>{const g=window.__game;g.scenario('drive');g.kickoff();const counter=g.hud.el('center-message'),badge=g.hud.el('bot-name');return{counter:Number(getComputedStyle(counter).zIndex),badge:Number(getComputedStyle(badge).zIndex),gaugeBindings:document.querySelectorAll('.boost-hud [data-hint],.boost-key').length,stripBinding:document.querySelector('.controls-strip [data-hint="boost"]')?.textContent};});
+ const ui=await p.evaluate(()=>{const g=window.__game;g.scenario('drive');g.kickoff();const counter=g.hud.el('center-message'),badge=g.hud.el('bot-name');return{counter:Number(getComputedStyle(counter).zIndex),badge:Number(getComputedStyle(badge).zIndex),gaugeBindings:document.querySelectorAll('.boost-hud [data-hint],.boost-key').length,stripCount:document.querySelectorAll('.controls-strip').length};});
  check('Countdown stacks above opponent badge',ui.counter>ui.badge,ui);
- check('Gauge omits binding while controls strip retains it',ui.gaugeBindings===0&&!!ui.stripBinding,ui);
+ check('HUD omits the boost binding and bottom controls strip',ui.gaugeBindings===0&&ui.stripCount===0,ui);
  const falloff=[];
  for(const distance of [5,16,35,55])falloff.push(await p.evaluate(distance=>{const g=window.__game;g.scenario('drive');g.physics.resetCar(g.physics.player,0,-50.55+distance);g.physics.ball.setTranslation({x:0,y:2,z:-53},true);g.advance(.15);g.score('blue');const time=g.remaining;g.advance(.42);const c=g.physics.player;return{distance,velocity:{...c.body.linvel()},position:{...c.body.translation()},timeUnchanged:g.remaining===time,ballEnabled:g.physics.ball.isEnabled(),phase:g.phase};},distance));
  check('Goal blast falls off with distance',falloff[0].velocity.z>falloff[1].velocity.z*1.5&&falloff[1].velocity.z>falloff[2].velocity.z*2&&Math.abs(falloff[3].velocity.z)<.05,falloff);

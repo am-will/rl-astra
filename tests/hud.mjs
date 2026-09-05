@@ -97,11 +97,12 @@ try {
     await page.setViewportSize({ width, height });
     layouts.push(await page.evaluate(() => {
       const rect = s => document.querySelector(s).getBoundingClientRect();
-      const a = rect('.scoreboard'), b = rect('.top-actions'), c = rect('.boost-hud'), d = rect('.bottom-left'), e = rect('.controls-strip');
-      return { width: innerWidth, height: innerHeight, scoreClear: a.right < b.left, boostInBounds: c.left >= 0 && c.right <= innerWidth && c.bottom <= innerHeight, cameraClear: d.right < e.left || d.bottom < e.top, overflow: document.documentElement.scrollWidth > innerWidth };
+      const a = rect('.scoreboard'), b = rect('.top-actions'), c = rect('.boost-hud'), d = rect('.bottom-left');
+      return { width: innerWidth, height: innerHeight, clockTop: rect('.clock').top, removed: !document.querySelector('.controls-strip,.player-card'), scoreClear: a.right < b.left, boostInBounds: c.left >= 0 && c.right <= innerWidth && c.bottom <= innerHeight, cameraClear: d.right < c.left || d.bottom < c.top, overflow: document.documentElement.scrollWidth > innerWidth };
     }));
   }
   check('HUD fits desktop, portrait and landscape without overlapping controls', layouts.every(l => l.scoreClear && l.boostInBounds && l.cameraClear && !l.overflow), layouts);
+  check('Black scoreboard center touches the screen top and redundant HUD elements are removed at every size', layouts.every(l => l.clockTop === 0 && l.removed), layouts);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const reduced = await page.evaluate(() => {
     const g = window.__game; g.hud.boostPickup(true); g.hud.set('blue-score', 2);

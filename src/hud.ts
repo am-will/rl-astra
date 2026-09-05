@@ -6,7 +6,6 @@ const icons = {
   pause: '<path d="M8 5v14M16 5v14"/>',
   sound: '<path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/>',
   expand: '<path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/>',
-  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 1 1 3 3.5l-.5 2M12 17h.01"/>',
   arrow: '<path d="m8 5 7 7-7 7"/>',
 };
 const icon = (name: keyof typeof icons) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
@@ -30,8 +29,7 @@ export class HUD {
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
       <div id="goal-flash"></div>
       <div id="bot-name" class="player-label orange" hidden><span id="opponent-boost" class="nameplate-boost" role="meter" aria-label="Maverick boost" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="opponent-boost-clip"><circle cx="12" cy="12" r="9.5"/></clipPath></defs><rect id="opponent-boost-fill" x="2.5" y="2.5" width="19" height="19" clip-path="url(#opponent-boost-clip)"/><circle class="nameplate-boost-outline" cx="12" cy="12" r="10"/></svg></span><span class="nameplate-name">MAVERICK</span></div>
-      <div class="bottom-left"><div class="player-card"><span class="player-avatar">01</span><div><strong>YOU<span class="team-tag">BLUE</span></strong><span id="player-status">OCTANE · READY TO PLAY</span></div></div><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><button class="ball-cam-corner" data-action="camera" aria-label="Toggle ball camera" hidden><span class="ball-cam-title"><i></i>BALL CAM</span><small>PRESS <kbd id="ball-cam-key" data-hint="camera">C</kbd> TO TOGGLE</small></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
-      <div class="controls-strip"><div><kbd data-hint="forward">W</kbd><span>DRIVE</span></div><div><kbd data-hint="jump">SPACE</kbd><span>JUMP / FLIP</span></div><div><kbd data-hint="boost">SHIFT</kbd><span>BOOST</span></div><div><kbd data-hint="unlimited">B</kbd><span id="infinite-label">UNLIMITED</span></div><button data-action="help" aria-label="Show all controls">${icon('help')}</button></div>
+      <div class="bottom-left"><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><button class="ball-cam-corner" data-action="camera" aria-label="Toggle ball camera" hidden><span class="ball-cam-title"><i></i>BALL CAM</span><small>PRESS <kbd id="ball-cam-key" data-hint="camera">C</kbd> TO TOGGLE</small></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
       <div class="boost-hud"></div>
       <div class="session-footer"><span>CHAMPIONS FIELD</span><span>EXHIBITION</span><span id="fps">60 FPS</span></div>
       <div id="pause-panel" class="overlay" hidden><section class="menu"><span class="eyebrow">CHAMPIONS FIELD / LOCAL PLAY</span><h2 id="pause-title">TIME OUT.</h2><p id="pause-description">Take a breath. The field will be here.</p><button class="primary-button" data-action="resume">BACK TO THE FIELD ${icon('arrow')}</button><div class="menu-options"><button data-action="bindings">CONTROLS & BINDINGS <span>KEYBOARD / CONTROLLER</span></button><button data-action="visuals">CAMERA & VISUALS <span>YOUR PERSPECTIVE</span></button><button data-action="restart">RESTART MATCH <span>↻</span></button><button data-action="mode">GAME MODE <span id="mode-value">1V1 · MAVERICK</span></button><button data-action="unlimited">UNLIMITED BOOST <span id="unlimited-value">OFF</span></button><button data-action="quality">VISUAL QUALITY <span id="quality-value">PERFORMANCE</span></button><button data-action="sound">SOUND <span id="sound-value">ON</span></button></div><button class="text-button" data-action="help">VIEW CONTROLS <kbd>H</kbd></button><div class="menu-footnote">BUILT FOR THE LOVE OF THE GAME.</div></section></div>
@@ -112,9 +110,7 @@ export class HUD {
     scoreboard.classList.toggle('is-final-seconds', data.time <= 10 && !data.overtime && !data.practice);
     this.boostGauge.update(data.boost, data.unlimited, data.boosting, data.supersonic, dt);
     this.set('speed', Math.round(data.speed * 3.6)); this.set('drive-state', data.grounded ? 'GROUNDED' : 'AIRBORNE');
-    this.set('player-status', data.supersonic ? 'SUPERSONIC' : data.grounded ? 'OCTANE · BLUE TEAM' : 'OCTANE · AIRBORNE');
     this.set('fps', `${Math.round(data.fps)} FPS`);
-    this.el('infinite-label').classList.toggle('active', data.unlimited);
     if (performance.now() > this.messageUntil) this.el('event-toast').classList.remove('visible');
   }
   camera(active: boolean) {

@@ -112,7 +112,7 @@ export class Game {
     this.controls.setMenuMode(this.paused || this.help || this.controlsMenu.visible || this.visualSettings.visible || this.phase === 'ended');
     // Only the topmost menu participates in keyboard focus or pointer input.
     this.hud.el('pause-panel').inert = this.help || this.controlsMenu.visible || this.visualSettings.visible;
-    for (const selector of ['.top-actions', '.bottom-left', '.controls-strip']) (this.hud.root.querySelector(selector) as HTMLElement).inert = this.paused || this.help || this.controlsMenu.visible || this.visualSettings.visible;
+    for (const selector of ['.top-actions', '.bottom-left']) (this.hud.root.querySelector(selector) as HTMLElement).inert = this.paused || this.help || this.controlsMenu.visible || this.visualSettings.visible;
   }
   restart() {
     this.view.audio.reset();
