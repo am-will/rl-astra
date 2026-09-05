@@ -203,7 +203,7 @@ export class GameRenderer {
     this.blast.uniforms.center.value.set(blastCenter.x * .5 + .5, blastCenter.y * .5 + .5);
     this.blast.uniforms.time.value = this.effects.explosion.age;
     this.blast.uniforms.aspect.value = this.camera.aspect;
-    this.audio.update(car, phase === 'playing' || phase === 'goal', dt);
+    this.audio.update(car, phase === 'playing' || phase === 'goal' || phase === 'countdown', dt, phase === 'countdown');
   }
   draw() { this.renderer.info.reset(); this.composer.render(); }
 }

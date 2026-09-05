@@ -18,7 +18,21 @@ try {
  await p.goto(process.env.GAME_URL || 'http://127.0.0.1:5179'); await p.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));
  const decoded = await p.evaluate(()=>{const a=window.__game.view.audio;return{context:!!a.ctx,failures:a.failures,clips:[...a.buffers].map(([key,b])=>({key,seconds:b.duration,channels:b.numberOfChannels}))}});
  check('Every original Ogg decodes before play, with no audible context before a gesture', !decoded.context && decoded.failures.length===0 && decoded.clips.length===23 && decoded.clips.every(c=>c.seconds>0), decoded);
- await p.keyboard.press('w'); await p.waitForFunction(()=>window.__game.view.audio.ctx?.state==='running');
+ const startPosition = await p.evaluate(()=>({...window.__game.physics.player.body.translation()}));
+ await p.keyboard.down('w'); await p.waitForFunction(()=>window.__game.view.audio.ctx?.state==='running');
+ await p.waitForFunction(()=>window.__game.view.audio.loops.get('engineHigh')?.source.playbackRate.value>1.32);
+ const kickoff = await p.evaluate(async()=>{
+  const g=window.__game,a=g.view.audio,probe=a.ctx.createAnalyser(),samples=new Float32Array(2048);
+  probe.fftSize=2048;a.engineGain.connect(probe);let sum=0,peak=0;
+  for(let i=0;i<8;i++){await new Promise(r=>setTimeout(r,20));probe.getFloatTimeDomainData(samples);for(const x of samples){sum+=x*x;peak=Math.max(peak,Math.abs(x));}}
+  a.engineGain.disconnect(probe);
+  return {phase:g.phase,position:{...g.physics.player.body.translation()},boost:g.physics.player.boost,boosting:g.physics.player.boosting,rate:a.loops.get('engineHigh').source.playbackRate.value,rms:Math.sqrt(sum/(8*samples.length)),peak};
+ });
+ check('Held kickoff throttle reaches an audible redline while the car and boost stay locked',kickoff.phase==='countdown'&&kickoff.rate>1.32&&kickoff.rate<1.42&&kickoff.rms>.01&&kickoff.rms<.08&&kickoff.peak<.4&&Math.hypot(kickoff.position.x-startPosition.x,kickoff.position.z-startPosition.z)<.01&&kickoff.boost===100&&!kickoff.boosting,kickoff);
+ await p.keyboard.up('w');
+ await p.waitForFunction(()=>window.__game.view.audio.engineRevs<.1);
+ const releasedKickoff=await p.evaluate(()=>({phase:window.__game.phase,load:window.__game.view.audio.engineLoad,revs:window.__game.view.audio.engineRevs}));
+ check('Releasing kickoff throttle drops back to idle during the countdown',releasedKickoff.phase==='countdown'&&releasedKickoff.load<.02&&releasedKickoff.revs<.1,releasedKickoff);
  await p.evaluate(()=>{window.requestAnimationFrame=()=>0;});await p.waitForTimeout(80);
  await p.evaluate(()=>{
   const g=window.__game,a=g.view.audio;g.practice=true;g.physics.botEnabled=false;g.scenario('drive');a.reset();a.setPaused(false);
@@ -29,7 +43,7 @@ try {
   const a=window.__game.view.audio, car={speed:0,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};a.update(car,true,1/60);await new Promise(r=>setTimeout(r,250));const idle=await window.audioEnergy();
   car.speed=20;car.throttle=1;for(let i=0;i<150;i++)a.update(car,true,1/60);await new Promise(r=>setTimeout(r,400));const fast=await window.audioEnergy();const mix=[...a.loops].map(([key,l])=>({key,rate:l.source.playbackRate.value,gain:l.gain.gain.value,buffer:!!l.source.buffer}));return{idle,fast,mix};
  });
- check('Octane buffers produce audible output while crossfading from idle to moderately higher full-throttle revs',engine.idle.rms>.003&&engine.fast.rms>.02&&engine.fast.rms<.04&&engine.mix.every(x=>x.buffer)&&engine.mix.find(x=>x.key==='engineIdle').gain<.01&&engine.mix.find(x=>x.key==='engineHigh').gain>.1&&engine.mix.find(x=>x.key==='engineHigh').rate>1.05&&engine.mix.find(x=>x.key==='engineHigh').rate<1.14&&engine.mix.filter(x=>x.key.startsWith('engine')).every(x=>x.rate<1.34),engine);
+ check('Driving reaches a higher redline with controlled output volume',engine.idle.rms>.003&&engine.fast.rms>.02&&engine.fast.rms<.04&&engine.mix.every(x=>x.buffer)&&engine.mix.find(x=>x.key==='engineIdle').gain<.01&&engine.mix.find(x=>x.key==='engineHigh').gain>.1&&engine.mix.find(x=>x.key==='engineHigh').rate>1.32&&engine.mix.find(x=>x.key==='engineHigh').rate<1.42&&engine.mix.filter(x=>x.key.startsWith('engine')).every(x=>x.rate<1.7),engine);
  const unload=await p.evaluate(async()=>{const a=window.__game.view.audio,c={speed:20,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};for(let i=0;i<120;i++)a.update(c,true,1/60);await new Promise(r=>setTimeout(r,350));const coast={revs:a.engineRevs,load:a.engineLoad,high:a.loops.get('engineHigh').gain.gain.value};c.grounded=false;c.throttle=1;for(let i=0;i<120;i++)a.update(c,true,1/60);return{coast,air:a.engineRevs};});
  check('Releasing throttle at high speed unloads the motor; aerials cannot force a redline',unload.coast.revs<.15&&unload.coast.load<.01&&unload.coast.high<.001&&unload.air<.4,unload);
  const boost=await p.evaluate(async()=>{const a=window.__game.view.audio,c={speed:20,boosting:true,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};a.update(c,true,1/60);const start=[...a.voices].some(v=>v.source.buffer===a.buffers.get('boostStart'));await new Promise(r=>setTimeout(r,2000));const energy=await window.audioEnergy();c.boosting=false;a.update(c,true,1/60);const release=[...a.voices].some(v=>v.source.buffer===a.buffers.get('boostStop'));await new Promise(r=>setTimeout(r,450));return{start,release,energy,loopGain:a.loops.get('boostLoop').gain.gain.value};});

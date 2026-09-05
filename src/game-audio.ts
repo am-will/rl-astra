@@ -120,20 +120,21 @@ export class GameAudio {
     this.ramp(loop.source.playbackRate, rate, .1);
   }
 
-  update(car: Pick<Car, 'speed' | 'boosting' | 'grounded' | 'drifting' | 'steer' | 'demolished' | 'throttle'>, active: boolean, dt: number) {
+  update(car: Pick<Car, 'speed' | 'boosting' | 'grounded' | 'drifting' | 'steer' | 'demolished' | 'throttle'>, active: boolean, dt: number, freeRev = false) {
     this.setPaused(dt <= 0);
     if (!this.ctx || !this.engineGain) return;
     const running = active && !this.paused && car.demolished <= 0;
     const speed = clamp(car.speed / 23), rolling = clamp(car.speed / 10);
-    // RPM follows the accelerator and tire travel, not world velocity alone.
-    // Coasting/airborne travel unloads the motor instead of sustaining a redline.
+    // The kickoff lock lets throttle reach redline without wheel travel.
+    // Driving revs follow tire speed; releasing throttle unloads the motor.
     const load = running ? clamp(Math.abs(car.throttle) + (car.boosting ? 1 : 0)) : 0;
     this.engineLoad += (load - this.engineLoad) * (1 - Math.exp(-dt * (load > this.engineLoad ? 4 : 8)));
     const tireSpeed = clamp(car.speed / 16);
-    const targetRevs = running ? this.engineLoad * (car.grounded ? .12 + tireSpeed * .68 : .36) + (1 - this.engineLoad) * tireSpeed * .12 : 0;
+    const drivenRevs = freeRev ? .8 : car.grounded ? .12 + tireSpeed * .68 : .36;
+    const targetRevs = running ? this.engineLoad * drivenRevs + (1 - this.engineLoad) * tireSpeed * .12 : 0;
     this.engineRevs += (targetRevs - this.engineRevs) * (1 - Math.exp(-dt * 5));
     const revs = this.engineRevs, upper = clamp((revs - .48) / .32);
-    const pitchLift = 1 + this.engineLoad * clamp((revs - .16) / .64) * .18;
+    const pitchLift = 1 + this.engineLoad * clamp((revs - .16) / .64) * .5;
     this.ramp(this.engineGain.gain, running ? .78 : 0, running ? .06 : .015);
     this.loop('engineIdle', .6 * (1 - clamp(revs * 2.5)), .88 + revs * .3, true);
     this.loop('engineLow', (.16 + this.engineLoad * .18) * Math.sin(clamp(revs / .8) * Math.PI), (.75 + revs * .45) * pitchLift, true);

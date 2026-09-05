@@ -145,6 +145,8 @@ export class Game {
     if (this.phase === 'ready' || this.phase === 'countdown') {
       this.physics.step(emptyInput(), emptyInput());
       if (this.phase === 'countdown') {
+        // Let the motor rev while the kickoff lock still blocks driving/boost.
+        this.physics.player.throttle = input.boost ? 1 : input.throttle;
         this.phaseTime -= STEP; const number = Math.ceil(this.phaseTime);
         if (number !== this.lastCountdown && number > 0) { this.hud.message(String(number), 'GET READY', 'CHAMPIONS FIELD', 'countdown'); this.view.audio.countdown(false); this.lastCountdown = number; }
         if (this.phaseTime <= 0) { this.phase = 'playing'; this.hud.message('GO!', '', '', 'countdown'); this.phaseTime = .85; this.view.audio.countdown(true); }
