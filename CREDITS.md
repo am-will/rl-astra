@@ -16,6 +16,10 @@ Files were obtained from [manrajpannu/rl-dart](https://github.com/manrajpannu/rl
 
 Barlow Condensed by Jeremy Tribby, distributed through Fontsource under the SIL Open Font License. License: `public/fonts/OFL.txt`.
 
+## Logo
+
+The original [Rocket League logo](https://commons.wikimedia.org/wiki/File:Rocket_League_logo.svg) by Psyonix, Inc. is used under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), as credited on Wikimedia Commons. The local SVG copies retain the original geometry, with white lettering for the dark HUD and a shield-only crop for compact screens and loading. These adaptations are also licensed under CC BY-SA 4.0. The logo remains a trademark of its respective owner.
+
 ## Visual and handling references
 
 - [Official Champions Field promotional image](https://rl-cdn.psyonix.com/bucket/web/news/rl/Champions-Field-06.jpg), Psyonix. Used as a visual reference; the image is not bundled into the game.

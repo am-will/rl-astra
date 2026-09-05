@@ -133,10 +133,11 @@ export class GameAudio {
     const targetRevs = running ? this.engineLoad * (car.grounded ? .12 + tireSpeed * .68 : .36) + (1 - this.engineLoad) * tireSpeed * .12 : 0;
     this.engineRevs += (targetRevs - this.engineRevs) * (1 - Math.exp(-dt * 5));
     const revs = this.engineRevs, upper = clamp((revs - .48) / .32);
+    const pitchLift = 1 + this.engineLoad * clamp((revs - .16) / .64) * .18;
     this.ramp(this.engineGain.gain, running ? .78 : 0, running ? .06 : .015);
     this.loop('engineIdle', .6 * (1 - clamp(revs * 2.5)), .88 + revs * .3, true);
-    this.loop('engineLow', (.16 + this.engineLoad * .18) * Math.sin(clamp(revs / .8) * Math.PI), .75 + revs * .45, true);
-    this.loop('engineHigh', .13 * upper * this.engineLoad, .72 + revs * .26, true);
+    this.loop('engineLow', (.16 + this.engineLoad * .18) * Math.sin(clamp(revs / .8) * Math.PI), (.75 + revs * .45) * pitchLift, true);
+    this.loop('engineHigh', .13 * upper * this.engineLoad, (.72 + revs * .26) * pitchLift, true);
     const boost = running && car.boosting;
     if (boost && !this.boosting) this.play('boostStart', .36, 1, 0, .08);
     if (!boost && this.boosting && running) this.play('boostStop', .5, 1, 0, .08);

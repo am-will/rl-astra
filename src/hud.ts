@@ -10,7 +10,8 @@ const icons = {
   arrow: '<path d="m8 5 7 7-7 7"/>',
 };
 const icon = (name: keyof typeof icons) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
-const shield = '<svg viewBox="0 0 50 57" fill="none" aria-hidden="true"><path d="M3 3h44v28L25 53 3 31z" fill="#107dde" stroke="#b2dfff" stroke-width="2"/><path d="m10 32 5-12h22l5 12v8h-7v-5H18v5h-8zm8-8-3 8h22l-3-8z" fill="white"/><circle cx="32" cy="13" r="6" fill="white"/></svg>';
+const shield = '<img src="/branding/rocket-league-shield.svg" width="60" height="58" alt="Rocket League" draggable="false">';
+const logo = '<picture class="rocket-league-logo"><source media="(max-width:650px)" srcset="/branding/rocket-league-shield.svg"><img src="/branding/rocket-league-logo.svg" width="132" height="48" alt="Rocket League" draggable="false"></picture>';
 export class HUD {
   root: HTMLElement;
   onAction: (action: string) => void = () => {};
@@ -21,7 +22,7 @@ export class HUD {
     this.root = document.createElement('main'); this.root.id = 'hud'; document.querySelector('#app')!.append(this.root);
     this.root.innerHTML = `
       <div class="vignette"></div>
-      <header class="identity">${shield}<div class="wordmark">ROCKET<br>LEAGUE</div><span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> <span id="lighting-label">NIGHT</span> <span>·</span> LOCAL MATCH</span></div></header>
+      <header class="identity">${logo}<span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> <span id="lighting-label">NIGHT</span> <span>·</span> LOCAL MATCH</span></div></header>
       <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">${scoreNumerals('0')}</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">${scoreNumerals('5:00')}</strong><b class="practice-label">FREE PLAY</b></div><div class="team team-orange"><strong id="orange-score">${scoreNumerals('0')}</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
       <nav class="top-actions" aria-label="Game settings"><span class="live-label"><i></i> LOCAL PLAY</span><button data-action="sound" aria-label="Toggle sound" title="Toggle sound (M)">${icon('sound')}</button><button data-action="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">${icon('expand')}</button><button data-action="pause" aria-label="Pause game" title="Pause (Esc)">${icon('pause')}</button></nav>
       <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
