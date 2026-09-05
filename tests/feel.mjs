@@ -18,7 +18,15 @@ const ride=await page.evaluate(({end,direction})=>{const g=window.__game;g.scena
 }
 const framing=[];
 for(const ball of [[0,19,10],[0,19,28],[0,19,29],[15,16,27],[0,5,32],[0,1,0]]){
-const view=await page.evaluate(ball=>{const g=window.__game;g.scenario('drive');g.advance(.3);g.hud.camera(true);g.view.shake=0;g.view.ballCam=true;g.view.cameraReady=false;g.physics.ball.setTranslation({x:ball[0],y:ball[1],z:ball[2]},true);for(let i=0;i<150;i++)g.view.update(1/60,'playing');g.view.draw();return{ball,ballScreen:g.view.ball.position.clone().project(g.view.camera).toArray(),carScreen:g.view.player.root.position.clone().project(g.view.camera).toArray(),camera:g.view.camera.position.toArray()};},ball);framing.push(view);check(`Ball cam frames car and ball at ${ball.join(',')}`,view.ballScreen[2]<1&&Math.abs(view.ballScreen[0])<.88&&Math.abs(view.ballScreen[1])<.84&&Math.abs(view.carScreen[0])<.92&&Math.abs(view.carScreen[1])<.83,view);
+const view=await page.evaluate(ball=>{
+  const g=window.__game;g.scenario('drive');g.advance(.3);g.hud.camera(true);g.view.shake=0;g.view.ballCam=true;g.view.cameraReady=false;g.physics.ball.setTranslation({x:ball[0],y:ball[1],z:ball[2]},true);
+  const v=g.view,lens=()=>[v.camera.fov,v.camera.position.y-v.player.root.position.y,Math.hypot(v.camera.position.x-v.player.root.position.x,v.camera.position.z-v.player.root.position.z)];
+  for(let i=0;i<150;i++)v.update(1/60,'playing');
+  const ballLens=lens(),ballScreen=v.ball.position.clone().project(v.camera).toArray();
+  v.ballCam=false;v.cameraReady=false;v.update(0,'playing');const carLens=lens();
+  v.ballCam=true;v.cameraReady=false;v.update(0,'playing');v.draw();
+  return{ball,ballScreen,ballLens,carLens,camera:v.camera.position.toArray()};
+},ball);framing.push(view);check(`Ball cam focuses on the ball without changing its lens at ${ball.join(',')}`,view.ballScreen[2]<1&&Math.abs(view.ballScreen[0])<.88&&Math.abs(view.ballScreen[1])<.84&&view.ballLens.every((value,i)=>Math.abs(value-view.carLens[i])<.001),view);
 if(ball[2]===29)await page.screenshot({path:'test-results/feel/ball-overhead.png'});
 }
 const sweep=await page.evaluate(()=>{const g=window.__game;g.scenario('drive');g.physics.resetCar(g.physics.player,0,0);g.view.ballCam=true;g.view.cameraReady=false;g.physics.ball.setTranslation({x:0,y:2,z:-12},true);g.view.update(0,'playing');const trace=[];let last=g.view.camera.quaternion.clone(),maxAngle=0,maxStep=0,offscreen=0;for(let i=0;i<600;i++){const t=i/60;const ball={x:10*Math.sin(t*.6),y:2+16*Math.sin(Math.PI*t/10)**2,z:-12*Math.cos(t*.6)};g.physics.ball.setTranslation(ball,true);const old=g.view.camera.position.clone();g.view.update(1/60,'playing');maxAngle=Math.max(maxAngle,last.angleTo(g.view.camera.quaternion));maxStep=Math.max(maxStep,old.distanceTo(g.view.camera.position));last.copy(g.view.camera.quaternion);const p=g.view.ball.position.clone().project(g.view.camera);if(i>30&&(Math.abs(p.x)>.95||Math.abs(p.y)>.95||p.z>1))offscreen++;if(i%60===0)trace.push({t,p:p.toArray(),camera:g.view.camera.position.toArray()});}return{maxAngle,maxStep,offscreen,trace};});

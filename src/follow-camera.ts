@@ -79,23 +79,13 @@ export class FollowCamera {
     this.forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const height = this.settings.height;
     const carFocus = pos.clone().addScaledVector(UP, .2);
-    // Fit the angular span of car and ball, rather than capping the look target
-    // a few metres above the car. The full-height ball can now stay in frame.
-    const elevation = Math.atan2(Math.max(0, toBall.y), Math.max(.1, planarDistance));
-    const overheadFov = 8 * MathUtils.smoothstep(elevation, .55, 1.3) * this.mode;
-    const baseFov = (this.settings.fov + (camera.aspect < 1.3 ? 9 : 0)) + Math.max(0, speed - 14) * .6 + overheadFov;
+    // Mode switches change the orbit and aim, never the lens or its distance.
+    // Speed response is shared too, including while the focus is transitioning.
+    const baseFov = this.settings.fov + (camera.aspect < 1.3 ? 9 : 0) + Math.max(0, speed - 14) * .6;
     const vertical = MathUtils.degToRad(baseFov), horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect);
     const available = Math.min(vertical, horizontal) * .80;
-    let fit = baseDistance;
-    if (this.mode > .001) for (; fit < 16.5; fit += .4) {
-      const eye = pos.clone().addScaledVector(this.forward, -fit).addScaledVector(UP, height);
-      const a = carFocus.clone().sub(eye), b = ball.clone().sub(eye);
-      const span = a.angleTo(b) + Math.asin(Math.min(.9, .8 / a.length())) + Math.asin(Math.min(.9, FIELD.ballRadius / b.length()));
-      if (span < available) break;
-    }
-    const desiredDistance = MathUtils.lerp(baseDistance, fit, this.mode);
-    if (reset) this.distance = desiredDistance;
-    else [this.distance, this.distanceVelocity] = spring(this.distance, this.distanceVelocity, desiredDistance, 10 * response, dt);
+    if (reset) this.distance = baseDistance;
+    else [this.distance, this.distanceVelocity] = spring(this.distance, this.distanceVelocity, baseDistance, 10, dt);
     let desired = pos.clone().addScaledVector(this.forward, -this.distance).addScaledVector(UP, height);
     desired.y = MathUtils.clamp(desired.y, .7, FIELD.height - .4);
     // Keep the lens above solid ground. Walls, ramps and the ceiling cage
@@ -106,12 +96,15 @@ export class FollowCamera {
     else this.clearance = MathUtils.damp(this.clearance, limit, 6, dt);
     desired = pos.clone().addScaledVector(offset, Math.min(length, this.clearance) / length);
     camera.position.copy(desired);
-    const pitch = MathUtils.degToRad(this.settings.angle);
-    const chase = this.forward.clone().multiplyScalar(Math.cos(pitch)).addScaledVector(UP, -Math.sin(pitch));
     const carDirection = carFocus.clone().sub(desired).normalize(), ballDirection = ball.clone().sub(desired).normalize();
+    // Honor the selected pitch where it fits, but aim toward the car when a
+    // narrow FOV would otherwise crop it out. This never moves the lens.
+    const carPitch = Math.asin(MathUtils.clamp(-carDirection.y, -1, 1));
+    const pitch = MathUtils.clamp(MathUtils.degToRad(this.settings.angle), carPitch - vertical * .28, carPitch + vertical * .28);
+    const chase = this.forward.clone().multiplyScalar(Math.cos(pitch)).addScaledVector(UP, -Math.sin(pitch));
     const span = carDirection.angleTo(ballDirection);
-    // When a wall prevents backing up far enough, prioritize keeping the ball
-    // in view. Otherwise the car sits below the ball with comfortable margins.
+    // Keep the ball in view by changing aim alone. A close/narrow camera may
+    // not fit both subjects when the ball is overhead; never zoom out to do so.
     const minimumWeight = 1 - available * .44 / Math.max(.001, span);
     const weight = MathUtils.clamp(.54 + (10 - this.settings.angle) * .008, Math.max(0, minimumWeight), 1);
     // Angle also biases ball-cam framing, while its visibility limit keeps the ball on screen.
@@ -135,7 +128,7 @@ export class FollowCamera {
       this.forward.applyQuaternion(orbit);
     }
     this.look.copy(camera.position).add(new Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(8));
-    camera.fov = reset ? baseFov : MathUtils.damp(camera.fov, baseFov, 5 * response, dt);
+    camera.fov = reset ? baseFov : MathUtils.damp(camera.fov, baseFov, 5, dt);
     camera.updateProjectionMatrix();
   }
 }

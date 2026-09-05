@@ -72,7 +72,7 @@ Open **Esc / Options → Controls & bindings** to replace, add, or remove keyboa
 
 Land all four wheel traces on the ball to regain the flip. Opposing pitch cancels an ongoing forward/backward flip. Landing on the wheels cancels a dodge and allows wavedash-style recovery. Small boost pads provide 12 boost and respawn after four seconds; large pads refill the tank and respawn after ten seconds. Collection checks the full car footprint against the pad housing with a small margin, so a single tire grazing a pad is enough. Both sizes play the same clean pickup sound.
 
-Open **Esc / Options → Camera & visuals** for saved FOV, camera height, distance, and downward-angle sliders. The field remains visible for a live paused preview. Car cam follows the selected pitch; ball cam biases its framing while keeping the ball visible. Switch camera modes from the preview button. Camera reset leaves quality and boost preferences intact.
+Open **Esc / Options → Camera & visuals** for saved FOV, camera height, distance, and downward-angle sliders. The field remains visible for a live paused preview. Both camera modes share the same FOV, height, distance, and speed response; switching changes only the orbit and focus. Car cam follows the selected pitch while keeping the car visible at narrow FOVs. Ball cam aims toward the ball without zooming out, so an overhead ball can take the car out of frame. Switch camera modes from the preview button. Camera reset leaves quality and boost preferences intact.
 
 With ball cam off, a tiny silver arrow with a round shaft beside the car points toward the ball, including airborne balls. It clears during goals and demolitions. Ball cam displays a red corner indicator with the active keyboard/controller binding. Ramps keep their solid tile faces inside the field and a transparent grid on the outside, so the camera can move through them without shortening its orbit. The scoreboard uses thin arena numerals on inward-tilted team panels, with a flat central clock.
 
@@ -96,7 +96,7 @@ Press **P** to toggle untimed solo practice, which starts immediately and skips 
 - `src/physics.ts`: Rapier rigid bodies, four-wheel suspension traces, curved wall transitions, contact impulses, jump/dodge control, pads, goal detection, and demolitions.
 - `src/game.ts`: Fixed 120 Hz simulation, bot behavior, match lifecycle, input actions, and development-only test scenarios.
 - `src/render.ts`: Interpolated car/ball poses between 120 Hz physics steps, lighting, shadowing, bloom, and effects.
-- `src/follow-camera.ts`: Smooth angular orbit, spring distance, roughly 0.38-second mode transitions, two-subject ball framing, high-ball field of view, and floor clearance. The camera passes through the transparent backs of ramps and arena walls.
+- `src/follow-camera.ts`: Smooth angular orbit, shared lens and spring distance across camera modes, roughly 0.38-second focus transitions, narrow-FOV car framing, and floor clearance. The camera passes through the transparent backs of ramps and arena walls.
 - `src/goal-frame.ts`: Layered beveled goal surrounds, silver U-shaped borders around flat side panels, inset team lamps, hex-tiled sills, and three translucent own-goal shields.
 - `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
 - `src/stadium-presentation.ts`: Live scoreboards, LED ribbons, animated light channels, cloth and crowd motion, goal celebration lighting, and Ultra roof beams.
