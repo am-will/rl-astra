@@ -29,3 +29,7 @@ Barlow Condensed by Jeremy Tribby, distributed through Fontsource under the SIL 
 - [Rapier JavaScript rigid-body documentation](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/).
 
 Rocket League, Octane, Champions Field, and associated names belong to their respective owners. This local fan recreation is not affiliated with Psyonix or Epic Games.
+
+## Sound effects
+
+24 original Ogg files from [ItsBrank/RocketLeague-Audio](https://github.com/ItsBrank/RocketLeague-Audio), pinned to `af49f0471dcf0b5ba02bc6a9c753b81f7d231b82`. See [audio credits](public/audio/rocket-league/CREDITS.md), [per-file provenance and hashes](public/audio/rocket-league/manifest.json), and the [preserved upstream license](public/audio/rocket-league/UPSTREAM-LICENSE). Original Rocket League audio is associated with Psyonix / Epic Games. No music is included.

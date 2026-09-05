@@ -1,0 +1,198 @@
+{
+  "repository": "https://github.com/ItsBrank/RocketLeague-Audio",
+  "commit": "af49f0471dcf0b5ba02bc6a9c753b81f7d231b82",
+  "clips": [
+    {
+      "cue": "engineIdle",
+      "file": "SFX_Motor_Car01_0005.ogg",
+      "source": "Motors/SFX_Motor_Car01/SFX_Motor_Car01_0005.ogg",
+      "sourceGitBlob": "400cae97ed1c3723305d9f2289e1e64454bf45ba",
+      "sha256": "8834e47384afb3a59218e8291bb28d9f541e3f3cd4a60a480dc2ddb18a26c29c",
+      "bytes": 84267
+    },
+    {
+      "cue": "engineLow",
+      "file": "SFX_Motor_Car01_0002.ogg",
+      "source": "Motors/SFX_Motor_Car01/SFX_Motor_Car01_0002.ogg",
+      "sourceGitBlob": "34f60d7317261f09a48723fe6036166024f1ab08",
+      "sha256": "fad318b34e9d92ad26da32e567a05ab783584decf9d608f2220fdbc965637f80",
+      "bytes": 58777
+    },
+    {
+      "cue": "engineHigh",
+      "file": "SFX_Motor_Car01_0003.ogg",
+      "source": "Motors/SFX_Motor_Car01/SFX_Motor_Car01_0003.ogg",
+      "sourceGitBlob": "44997f411024526b2459a2e3808715393a3af901",
+      "sha256": "1206a2bf3f72b00094e9f36d04639d8260e921676ec3dcab18be0f1f526ef6a6",
+      "bytes": 85761
+    },
+    {
+      "cue": "boostStart",
+      "file": "SFX_Boost_Standard_0002.ogg",
+      "source": "Boosts/SFX_Boost_Standard/SFX_Boost_Standard_0002.ogg",
+      "sourceGitBlob": "8e5729960e795801c05f0a0f8eb3137946445673",
+      "sha256": "c36565a400e197dafda0eefef60b5cd378a36042dccf15b4287df760b5d0a399",
+      "bytes": 50305
+    },
+    {
+      "cue": "boostLoop",
+      "file": "SFX_Boost_Standard_0003.ogg",
+      "source": "Boosts/SFX_Boost_Standard/SFX_Boost_Standard_0003.ogg",
+      "sourceGitBlob": "6289bcfe37c6291da905d90bf61c57f5cc23d58f",
+      "sha256": "158015d25594e562d2afb0b0385077d2aff6552254e8bc7822de90912edd570d",
+      "bytes": 118719
+    },
+    {
+      "cue": "boostStop",
+      "file": "SFX_Boost_Standard_0001.ogg",
+      "source": "Boosts/SFX_Boost_Standard/SFX_Boost_Standard_0001.ogg",
+      "sourceGitBlob": "6a4954f56cef1a8ea8644cf0956eff8aba77216e",
+      "sha256": "4a8249c96cb41460c2b5101578de920085dc4c49388d042f111614917554ec52",
+      "bytes": 28872
+    },
+    {
+      "cue": "tires",
+      "file": "SFX_Car_Tires_0007.ogg",
+      "source": "Uncategorized/SFX_Car_Tires/SFX_Car_Tires_0007.ogg",
+      "sourceGitBlob": "436ed44ef217fca7a27646c7f750d83738d41433",
+      "sha256": "a9747a48d2d2b704047812462d94e47b460a60a61c92fd534b73fbefb66250e3",
+      "bytes": 51080
+    },
+    {
+      "cue": "drift",
+      "file": "SFX_Car_Tires_0001.ogg",
+      "source": "Uncategorized/SFX_Car_Tires/SFX_Car_Tires_0001.ogg",
+      "sourceGitBlob": "8be056fb6cc417dae770a8db90a1c31b83d38734",
+      "sha256": "cdab64184d9a83d9718aefcafa13cd8e0e720b67d5c12843db5f48073e4b51e0",
+      "bytes": 56484
+    },
+    {
+      "cue": "hitSoft",
+      "file": "SFX_Impacts_0015.ogg",
+      "source": "Uncategorized/SFX_Impacts/SFX_Impacts_0015.ogg",
+      "sourceGitBlob": "384a3c3264f38cba2f4bb159acbd72066aacc68e",
+      "sha256": "a53e1c49b5fac52c5c63936122f39ff731ee9b3922ed788630f384ef9e230ca7",
+      "bytes": 10383
+    },
+    {
+      "cue": "hitHard",
+      "file": "SFX_Impacts_0013.ogg",
+      "source": "Uncategorized/SFX_Impacts/SFX_Impacts_0013.ogg",
+      "sourceGitBlob": "00e1d0a242603da2eca20fbdf76798df7a8121db",
+      "sha256": "9b9d982377bf176be65dba25454f48659ac0c9be4e72202dd6175d11c3877220",
+      "bytes": 10596
+    },
+    {
+      "cue": "hitAlt",
+      "file": "SFX_Impacts_0450.ogg",
+      "source": "Uncategorized/SFX_Impacts/SFX_Impacts_0450.ogg",
+      "sourceGitBlob": "1d6a32f5c7c50b9efa6323ab82ab0af19647394a",
+      "sha256": "1f1544e53a69f8dc3ebcfc0eb7f283dbfe9f3806c8c5775f497149a21502ede1",
+      "bytes": 12020
+    },
+    {
+      "cue": "jump",
+      "file": "SFX_Car_Movements_0001.ogg",
+      "source": "Uncategorized/SFX_Car_Movements/SFX_Car_Movements_0001.ogg",
+      "sourceGitBlob": "f1665bfc410bdc8a70dfbaae66d34dd65782a1e8",
+      "sha256": "270c248b7a0f6d6e2506a441cfc3a2496beb09342376db24b60b86eacc5dab62",
+      "bytes": 24456
+    },
+    {
+      "cue": "jumpAlt",
+      "file": "SFX_Car_Movements_0015.ogg",
+      "source": "Uncategorized/SFX_Car_Movements/SFX_Car_Movements_0015.ogg",
+      "sourceGitBlob": "399ff21502dbb8adeae68060c3ebaebfdd549524",
+      "sha256": "30c536499eeddbf9b66ec4da603b8cb291e740e6a3e0ca05cd5e2110d7fea5c2",
+      "bytes": 24607
+    },
+    {
+      "cue": "dodge",
+      "file": "SFX_Car_Movements_0004.ogg",
+      "source": "Uncategorized/SFX_Car_Movements/SFX_Car_Movements_0004.ogg",
+      "sourceGitBlob": "bc79798857ae84a06470ecd157c7326554831d83",
+      "sha256": "0f6805b971b5df186c1ee3eace05b1c22e3b08333e25eef714beac3eb2069bea",
+      "bytes": 35992
+    },
+    {
+      "cue": "land",
+      "file": "SFX_Impacts_0007.ogg",
+      "source": "Uncategorized/SFX_Impacts/SFX_Impacts_0007.ogg",
+      "sourceGitBlob": "a84ccf498928fabf3c09fe7506a318e546a454c7",
+      "sha256": "0f87934ff31a0a56a562077e2ae9acc7984cd1d2d727a67428fa79335fb60708",
+      "bytes": 16574
+    },
+    {
+      "cue": "demolition",
+      "file": "SFX_VehicleElements_0001.ogg",
+      "source": "Uncategorized/SFX_VehicleElements/SFX_VehicleElements_0001.ogg",
+      "sourceGitBlob": "4359912fcbe3a27c5e1236848f788fef65d7a068",
+      "sha256": "028a3f5e8ae15199efa4a637c35b0bccdfe643820df11f6903871dbb502ea74d",
+      "bytes": 67672
+    },
+    {
+      "cue": "pickupSmall",
+      "file": "SFX_UI_Boost_0003.ogg",
+      "source": "UserInterface/SFX_UI_Boost/SFX_UI_Boost_0003.ogg",
+      "sourceGitBlob": "3ccc35999b829a459a8771b277cecab495f39a2d",
+      "sha256": "99af5299a5ff70df2d79129b6066b08b90c5f857aabe5fa9922476a876231edc",
+      "bytes": 26208
+    },
+    {
+      "cue": "pickupBig",
+      "file": "SFX_UI_Boost_0007.ogg",
+      "source": "UserInterface/SFX_UI_Boost/SFX_UI_Boost_0007.ogg",
+      "sourceGitBlob": "8b443cded5e65989d972d18be38b6fdf930e7b5a",
+      "sha256": "7a66fa0c08f5af1756bc41f8bad428bb2769808689f6fc51e4ec1edc09eee29c",
+      "bytes": 65101
+    },
+    {
+      "cue": "countdown",
+      "file": "SFX_UI_Countdown_0001.ogg",
+      "source": "UserInterface/SFX_UI_Countdown/SFX_UI_Countdown_0001.ogg",
+      "sourceGitBlob": "a1fd7b5644a6b44881f73812c98c8f4575fa0bb0",
+      "sha256": "d83908234f9b09bc354afe81fd416268cc27440a770ee9112244203c376f841e",
+      "bytes": 92099
+    },
+    {
+      "cue": "go",
+      "file": "SFX_UI_Countdown_0002.ogg",
+      "source": "UserInterface/SFX_UI_Countdown/SFX_UI_Countdown_0002.ogg",
+      "sourceGitBlob": "7f25ec8dc261a8a42da215219eaf9d8b052d4a8a",
+      "sha256": "468956f7bd01806db9a97ba954933108b43ea9d9b2d9048917fd2cc485fda53d",
+      "bytes": 121065
+    },
+    {
+      "cue": "goal",
+      "file": "SFX_GoalExplosion_NewDefault_0001.ogg",
+      "source": "GoalExplosions/SFX_GoalExplosion_NewDefault/SFX_GoalExplosion_NewDefault_0001.ogg",
+      "sourceGitBlob": "16643484d23b333d3d622b412af838ce14a6acbb",
+      "sha256": "a78458192eb708b305ea1cbccfecd69e036fa9e537ec16f0f7ee01924f48fc30",
+      "bytes": 602619
+    },
+    {
+      "cue": "cheer",
+      "file": "SFX_BG_Crowd_0003.ogg",
+      "source": "Crowds/SFX_BG_Crowd/SFX_BG_Crowd_0003.ogg",
+      "sourceGitBlob": "60dbca7eba58a4d28e1638c2ac76ecb690dfdc1c",
+      "sha256": "0bc2c983d5d2c6332bd44fd822fd7ebf71706510764a6084f2dc8e809ae74df7",
+      "bytes": 86138
+    },
+    {
+      "cue": "flipReset",
+      "file": "SFX_UI_InGame_0001.ogg",
+      "source": "UserInterface/SFX_UI_InGame/SFX_UI_InGame_0001.ogg",
+      "sourceGitBlob": "d9edff361189a8d3282500ee4e1307dcf5f46d3b",
+      "sha256": "cf7601a6bc377a25627155a9593ef7162dbb74ee3968a5103c3b422bcc302a5a",
+      "bytes": 48161
+    },
+    {
+      "cue": "menu",
+      "file": "SFX_UI_InGame_0006.ogg",
+      "source": "UserInterface/SFX_UI_InGame/SFX_UI_InGame_0006.ogg",
+      "sourceGitBlob": "7a072f939c627af4e315037c6093762af00ef484",
+      "sha256": "14153237f59d2e6229e739cb587a04a62c3c7471aaa1a6f40f98c0d0ec716b1f",
+      "bytes": 22072
+    }
+  ]
+}

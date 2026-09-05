@@ -10,7 +10,7 @@ export interface Car {
   body: RAPIER.RigidBody; collider: RAPIER.Collider; boost: number; grounded: boolean; wheels: number;
   jumpCount: number; airTime: number; jumpTime: number; flipTime: number; flipAxis: Vector3; flipRotation: Quaternion; pitchLock: number;
   boosting: boolean; speed: number; supersonic: boolean; supersonicGrace: number; touchCooldown: number; resetCooldown: number; demolished: number;
-  steer: number; drifting: boolean;
+  steer: number; drifting: boolean; throttle: number;
   previousPosition: Vector3; previousRotation: Quaternion;
   recoveryTime: number; recoveryStart: Quaternion; recoveryTarget: Quaternion;
   blastTime: number;
@@ -32,6 +32,9 @@ export class Physics {
   onPad: (big: boolean) => void = () => {};
   onFlipReset: () => void = () => {};
   onDemo: (car: Car) => void = () => {};
+  onJump: (car: Car, dodge: boolean) => void = () => {};
+  onLand: (car: Car, speed: number) => void = () => {};
+  onBounce: (position: Vector3, speed: number) => void = () => {};
   async init() {
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -CAR.gravity, z: 0 });
@@ -72,7 +75,7 @@ export class Physics {
   createCar(x: number, z: number, yaw: number): Car {
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, .38, z).setRotation(new Quaternion().setFromAxisAngle(UP, yaw)).setLinearDamping(.05).setAngularDamping(0).setCcdEnabled(true).setCanSleep(false));
     const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setFriction(.035).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(.08), body);
-    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
+    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, throttle: 0, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
   }
   resetCar(car: Car, x = 0, z = car === this.player ? 29 : -29, yaw = car === this.player ? 0 : Math.PI) {
     car.body.setEnabled(car !== this.bot || this.botEnabled);
@@ -83,7 +86,7 @@ export class Physics {
     car.body.resetForces(true);
     car.previousPosition.copy(car.body.translation()); car.previousRotation.copy(car.body.rotation());
     car.groundNormal.copy(UP);
-    Object.assign(car, { speed: 0, supersonic: false, supersonicGrace: 0, steer: 0, drifting: false, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
+    Object.assign(car, { speed: 0, supersonic: false, supersonicGrace: 0, steer: 0, drifting: false, throttle: 0, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
   }
   reset() {
     this.resetCar(this.player); this.resetCar(this.bot);
@@ -133,7 +136,7 @@ export class Physics {
   }
   updateCar(car: Car, input: Input, dt: number) {
     const wasGrounded = car.grounded;
-    car.steer = input.steer; car.drifting = input.drift;
+    car.steer = input.steer; car.drifting = input.drift; car.throttle = input.throttle;
     car.pitchLock = Math.max(0, car.pitchLock - dt);
     if (car.demolished > 0) { car.demolished -= dt; if (car.demolished <= 0) this.resetCar(car, car === this.player ? -20 : 20); return; }
     const body = car.body, pos = v3(body.translation()), q = new Quaternion().copy(body.rotation());
@@ -161,6 +164,10 @@ export class Physics {
     car.wheels = contacts;
     if (contacts >= 3 && car.flipTime > 0 && up.y > .65 && car.airTime > .08) car.flipTime = 0;
     car.grounded = contacts >= 2 && car.jumpTime <= 0 && car.flipTime <= 0;
+    if (car.grounded && !wasGrounded && car.airTime > .1) {
+      const impact = Math.max(0, -velocity.dot(normal.clone().normalize()));
+      if (impact > 1.5) this.onLand(car, impact);
+    }
     if (contacts > 0 && car.jumpTime <= 0 && car.flipTime <= 0 && !input.jump) {
       // RocketSim _UpdateWheels: half gravity of baseline adhesion, with an
       // orientation-dependent extra force on walls while driving. On a flat
@@ -254,6 +261,7 @@ export class Physics {
     if (input.jump && car.recoveryTime <= 0) {
       if (car.grounded) {
         velocity.addScaledVector(up, CAR.jumpSpeed); car.jumpCount = 1; car.jumpTime = .2; car.grounded = false;
+        this.onJump(car, false);
       } else if (car.jumpCount < 2 && (car.airTime < 1.45 || car.jumpCount === 0)) {
         car.jumpCount = 2;
         const dodgeForward = input.dodgeForward ?? input.throttle, dodgeSide = input.dodgeSide ?? input.steer;
@@ -262,6 +270,7 @@ export class Physics {
           velocity.addScaledVector(direction, 5); velocity.y = Math.max(velocity.y, 1.3);
           car.flipAxis.copy(new Vector3(-dodgeForward, 0, dodgeSide).normalize()); car.flipRotation.copy(q); car.flipTime = .65;
         } else velocity.addScaledVector(up, CAR.jumpSpeed);
+        this.onJump(car, car.flipTime > 0);
       }
     }
     if (car.jumpTime > 0) { if (input.jumpHeld) velocity.addScaledVector(up, CAR.jumpHoldAcceleration * dt); car.jumpTime -= dt; }
@@ -307,6 +316,14 @@ export class Physics {
     this.incomingCarVelocities[1].copy(this.bot.body.linvel());
     this.bot.body.setEnabled(this.botEnabled && this.bot.demolished <= 0);
     this.world.step();
+    if (this.ball.isEnabled()) {
+      const impact = v3(this.ball.linvel()).sub(incomingBallVelocity).length();
+      if (impact > 2) {
+        let arenaContact = false;
+        this.world.contactPairsWith(this.ballCollider, other => { if (!other.parent()) arenaContact = true; });
+        if (arenaContact) this.onBounce(v3(this.ball.translation()), impact);
+      }
+    }
     for (const car of [this.player, ...(this.botEnabled ? [this.bot] : [])]) {
       car.touchCooldown = Math.max(0, car.touchCooldown - dt);
       let touching = false;

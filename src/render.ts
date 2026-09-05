@@ -5,7 +5,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createBall, createCarModel, type CarModel } from './assets';
-import { Effects, GameAudio } from './effects';
+import { Effects } from './effects';
+import { GameAudio } from './game-audio';
 import { Stadium, glowTexture } from './stadium';
 import { FIELD } from './config';
 import type { Physics, Car } from './physics';
@@ -202,7 +203,7 @@ export class GameRenderer {
     this.blast.uniforms.center.value.set(blastCenter.x * .5 + .5, blastCenter.y * .5 + .5);
     this.blast.uniforms.time.value = this.effects.explosion.age;
     this.blast.uniforms.aspect.value = this.camera.aspect;
-    this.audio.update(car.speed, car.boosting, (phase === 'playing' || phase === 'goal') && car.demolished <= 0 && dt > 0);
+    this.audio.update(car, phase === 'playing' || phase === 'goal', dt);
   }
   draw() { this.renderer.info.reset(); this.composer.render(); }
 }
