@@ -13,6 +13,34 @@ try {
   await mkdir('test-results/goal-shape', { recursive: true });
   await page.goto('http://127.0.0.1:5179');
   await page.waitForFunction(() => window.__game?.view && !document.querySelector('#loading'));
+  const shape = await page.evaluate(async () => {
+    const { default: R } = await import('/node_modules/.vite/deps/@dimforge_rapier3d-compat.js');
+    const { FIELD: f } = await import('/src/config.ts');
+    const { GOAL_REAR_RADIUS: r } = await import('/src/arena.ts');
+    const g = window.__game; g.scenario('drive'); g.advance(.05);
+    const sides = [], rear = [];
+    for (const end of [-1, 1]) {
+      for (const side of [-1, 1]) for (const depth of [.5, 3, 6, 8.4]) {
+        const hit = g.physics.world.castRayAndGetNormal(new R.Ray({ x: 0, y: 3, z: end * (f.length + depth) }, { x: side, y: 0, z: 0 }), 12, true, R.QueryFilterFlags.EXCLUDE_DYNAMIC);
+        sides.push({ end, side, depth, distance: hit?.timeOfImpact, normal: hit?.normal });
+      }
+      for (const y of [.5, 1.5, 3.2, 4.9, 5.9]) for (const x of [-7.7, 0, 7.7]) {
+        const hit = g.physics.world.castRayAndGetNormal(new R.Ray({ x, y, z: end * (f.length + 1) }, { x: 0, y: 0, z: end }), 12, true, R.QueryFilterFlags.EXCLUDE_DYNAMIC);
+        const floorOrRoof = Math.min(y, f.goalHeight - y);
+        const expected = floorOrRoof >= r ? f.goalDepth : f.goalDepth - r + Math.sqrt(r * r - (r - floorOrRoof) ** 2);
+        rear.push({ end, x, y, depth: hit ? hit.timeOfImpact + 1 : null, expected, normal: hit?.normal });
+      }
+    }
+    const panels = g.view.scene.children.filter(o => o.name === 'arena-goal-side').map(o => {
+      const p = o.geometry.attributes.position; let min = Infinity, max = -Infinity;
+      for (let i = 0; i < p.count; i++) { min = Math.min(min, p.getX(i)); max = Math.max(max, p.getX(i)); }
+      return { min, max };
+    });
+    return { width: f.goalWidth, sides, rear, panels };
+  });
+  check('Side collision walls run straight back at constant width', shape.sides.every(p => Math.abs(p.distance - shape.width) < .001 && Math.abs(p.normal.x) > .999 && Math.abs(p.normal.z) < .001), shape.sides);
+  check('All four visible side panels are planar', shape.panels.length === 4 && shape.panels.every(p => p.max - p.min < .00001 && Math.abs(Math.abs(p.min) - shape.width) < .001), shape.panels);
+  check('Rear curvature is identical across the width and only varies with height', shape.rear.every(p => p.depth !== null && Math.abs(p.depth - p.expected) < .004 && Math.abs(p.normal.x) < .001), shape.rear);
   for (const [view, position, target] of [
     ['own-front', [0, 3.1, 34], [0, 3, 55]],
     ['inside-out', [0, 2.8, 56], [0, 2.5, 44]],

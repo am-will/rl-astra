@@ -11,7 +11,9 @@ for(let i=0;i<hits.length;i++){const ratio=hits[i].ball.z/before[i].z,up=hits[i]
 const crowd=await page.evaluate(async()=>{const {Matrix4,Vector3}=await import('/node_modules/.vite/deps/three.js');const g=window.__game,c=g.view.scene.getObjectByName('stadium-crowd'),m=new Matrix4(),pos=new Vector3(),scale=new Vector3();let intruders=0;for(let i=0;i<c.count;i++){c.getMatrixAt(i,m);pos.setFromMatrixPosition(m);scale.setFromMatrixScale(m);if(Math.abs(pos.x)-scale.x*.14<8.93&&Math.abs(pos.z)-scale.z*.14<60.1&&Math.abs(pos.z)+scale.z*.14>51&&pos.y-scale.y*.14<6.7)intruders++;}let seats=0;g.view.scene.getObjectByName('end-stands').traverse(o=>{if(!o.geometry)return;const a=o.geometry.attributes.position;for(let i=0;i<a.count;i++)if(Math.abs(a.getX(i))<9.2&&Math.abs(a.getZ(i))<60.5&&a.getY(i)<6.9)seats++;});return{intruders,seats,count:c.count};});
 check('Spectators and seating clear both goal volumes',crowd.intruders===0&&crowd.seats===0&&crowd.count===10500,crowd);
 const rides=[];
-for(const end of [-1,1])for(const direction of ['left','right','back']){
+// Side panels are planar; only the rear has a driveable curved floor return.
+// tests/goals.mjs checks constant-width side collision planes at four depths.
+for(const end of [-1,1])for(const direction of ['back']){
 const ride=await page.evaluate(({end,direction})=>{const g=window.__game;g.scenario('drive');g.physics.ball.setTranslation({x:20,y:1,z:0},true);const yaw=direction==='left'?Math.PI/2:direction==='right'?-Math.PI/2:end>0?Math.PI:0;g.physics.resetCar(g.physics.player,0,end*55.7,yaw);let max=0,up=false,minSpeed=100;const trace=[];for(let i=0;i<180;i++){g.advance(1/120,{throttle:1,boost:true});const c=g.physics.player,p=c.body.translation();max=Math.max(max,p.y);if(p.y>2.2&&c.grounded)up=true;if(i>35&&i<90)minSpeed=Math.min(minSpeed,c.speed);if(i%30===0)trace.push({p:{...p},wheels:c.wheels,speed:c.speed});}return{end,direction,max,up,minSpeed,trace};},{end,direction});rides.push(ride);check(`Wide goal ramp drives onto ${end} ${direction} wall`,ride.max>3&&ride.up&&ride.minSpeed>2,ride);
 }
 const framing=[];

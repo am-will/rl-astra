@@ -77,7 +77,7 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 - `src/game.ts`: Fixed 120 Hz simulation, bot behavior, match lifecycle, input actions, and development-only test scenarios.
 - `src/render.ts`: Interpolated car/ball poses between 120 Hz physics steps, lighting, shadowing, bloom, and effects.
 - `src/follow-camera.ts`: Smooth angular orbit, spring distance, gradual mode transitions, two-subject ball framing, high-ball field of view, and collision avoidance against opaque ramps. Transparent arena walls do not pin the camera to the car.
-- `src/goal-frame.ts`: Layered beveled goal surrounds, silver corner borders at the left and right mouth edges, inset team lamps, hex-tiled sills, and three translucent own-goal shields.
+- `src/goal-frame.ts`: Layered beveled goal surrounds, silver U-shaped borders around flat side panels, inset team lamps, hex-tiled sills, and three translucent own-goal shields.
 - `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
 - `src/models.ts`: Detailed Octane and ball assets, material setup, and independent wheel pivots.
 - `src/boost-pad.ts`: Low three-lobed silver housings, recessed sockets, and amber inserts. Collected large orbs contract into their sockets over 180 ms; small emitters dim and retract over 120 ms. The housing remains visible during cooldown.
@@ -93,7 +93,7 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 
 Countdown, kickoff, goals, overtime and event popups use chunky gradient lettering with black outlines and offset black shadows, matching the demolition art. Announcements animate with a short pop; reduced-motion preferences suppress that entrance.
 
-Goal interiors use 2.56-unit floor fillets tapering flush at the mouth, gently narrowing side walls, rounded rear corner profiles, and roof curves that broaden into the goal. The visible net and collision shell share this geometry. Curved rear surfaces retain fine transparent honeycomb, with silver trim confined to the outer left and right corner borders. Three faint shields mark the blue own goal from the field side only. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
+Goal side walls are flat, parallel planes running straight back at constant width. Only the rear curves in the depth/height plane, using 2.56-unit floor and roof returns extruded across the goal width. The visible net and collision shell share this geometry. Curved rear surfaces retain fine transparent honeycomb, with silver U-shaped borders in the flat left and right side planes. Three faint shields mark the blue own goal from the field side only. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
 
 Goal celebrations keep the cars and all driving/aerial inputs active. The blast launches nearby cars more strongly and fades with distance; the match clock and scored ball stay stopped until the next kickoff. Demolished cars are temporarily disabled in place so the camera remains above the field before respawn.
 

@@ -1,27 +1,15 @@
 import * as T from 'three';
 import { FIELD } from './config';
-import { goalRadii, goalBoundary } from './arena';
+import { GOAL_MOUTH_RADIUS, goalSideProfile } from './arena';
 import { box, material, mergeStatic } from './assets';
 
-// Cross-sections follow the same floor and roof radii as the collision shell.
-// Metal trim belongs to the mouth edges; the recessed shell remains clear.
-const leftBoundary = goalBoundary(1).filter(p => p.x < 0);
-function sidePoint(depth: number) {
-  const index = Math.max(1, leftBoundary.findIndex(p => p.z - FIELD.length >= depth));
-  const a = leftBoundary[index - 1], b = leftBoundary[index], t = T.MathUtils.clamp((FIELD.length + depth - a.z) / (b.z - a.z), 0, 1);
-  return { x: T.MathUtils.lerp(a.x, b.x, t), nx: T.MathUtils.lerp(a.nx, b.nx, t), nz: T.MathUtils.lerp(a.nz, b.nz, t) };
-}
+// The entrance arch is independent of the depth/height U-shaped side border.
 function section(depth: number, outset = 0) {
-  const { bottom, top } = goalRadii(depth), p = sidePoint(depth), w = -p.x + outset, h = FIELD.goalHeight + outset;
-  const b = Math.max(.001, bottom), r = top + outset, left: T.Vector3[] = [];
+  const w = FIELD.goalWidth + outset, h = FIELD.goalHeight + outset;
+  const b = .001, r = GOAL_MOUTH_RADIUS + outset, left: T.Vector3[] = [];
   for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI / 2; left.push(new T.Vector3(-w + b - b * Math.sin(a), b * (1 - Math.cos(a)), depth)); }
   for (let i = 1; i <= 12; i++) left.push(new T.Vector3(-w, T.MathUtils.lerp(b, h - r, i / 12), depth));
   for (let i = 1; i <= 24; i++) { const a = i / 24 * Math.PI / 2; left.push(new T.Vector3(-w + r - r * Math.cos(a), h - r + r * Math.sin(a), depth)); }
-  // Follow the tapered side's normal, including the depth offset in the fillets.
-  for (const point of left) {
-    const offset = -w - point.x;
-    point.x = p.x + p.nx * (offset + outset); point.z += p.nz * (offset + outset);
-  }
   const points = [...left];
   const shoulder = left.at(-1)!;
   for (let i = 1; i < 48; i++) points.push(new T.Vector3(T.MathUtils.lerp(shoulder.x, -shoulder.x, i / 48), h, shoulder.z));
@@ -84,34 +72,23 @@ export function createGoalFrame(team: number) {
   ribbon(front(.015, -.22), section(.65, .025), gunmetal);
   rail(front(.19, -.414), .032, pinstripe);
   rail(front(.56, -.416), .047, light);
-  // Two separate C-shaped trims hug the outside left/right mouth edges.
-  // Their ends stop at the corner tangencies, never spanning the roof center.
-  const cornerBorder = (side: number, outset: number, depth: number) => {
-    const { top } = goalRadii(0), w = FIELD.goalWidth + outset;
-    const bottom = .7, points: T.Vector3[] = [];
-    for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI / 2; points.push(new T.Vector3(side * (w + bottom - bottom * Math.sin(a)), bottom * (1 - Math.cos(a)), depth)); }
-    for (let i = 1; i <= 12; i++) points.push(new T.Vector3(side * w, T.MathUtils.lerp(bottom, FIELD.goalHeight - top, i / 12), depth));
-    for (let i = 1; i <= 24; i++) { const a = i / 24 * Math.PI / 2; points.push(new T.Vector3(side * (FIELD.goalWidth - top + (top + outset) * Math.cos(a)), FIELD.goalHeight - top + (top + outset) * Math.sin(a), depth)); }
-    return points;
-  };
+  // The silver U borders lie in the flat x = +/- goalWidth side planes.
+  // They run straight along the sill/header and bend around the back only.
   for (const side of [-1, 1]) {
-    ribbon(cornerBorder(side, .015, -.28), cornerBorder(side, .1, -.45), alloy);
-    ribbon(cornerBorder(side, .1, -.45), cornerBorder(side, .4, -.45), alloy);
-    ribbon(cornerBorder(side, .4, -.45), cornerBorder(side, .46, -.34), gunmetal);
-    ribbon(cornerBorder(side, .46, -.34), cornerBorder(side, .46, .22), graphite);
-    rail(cornerBorder(side, .095, -.466), .017, pinstripe);
-    // Small lamps are inset into the upper outside corners of the mouth.
-    const { top } = goalRadii(0);
-    for (const angle of [.28, .65, 1.02]) {
-      const x = side * (FIELD.goalWidth - top + (top + .25) * Math.cos(angle));
-      const y = FIELD.goalHeight - top + (top + .25) * Math.sin(angle);
-      box(body, [.15, .27, .032], [x, y, -.472], graphite, [0, 0, side * angle]);
-      box(body, [.07, .17, .018], [x, y, -.492], light, [0, 0, side * angle]);
+    const border = (inset: number, face = .025) => goalSideProfile(inset).map(p => new T.Vector3(side * (FIELD.goalWidth - face), p.y, p.x));
+    ribbon(border(.025), border(.13, .065), gunmetal);
+    ribbon(border(.13, .065), border(.5, .065), alloy);
+    ribbon(border(.5, .065), border(.59), graphite);
+    rail(border(.16, .083), .017, pinstripe);
+    rail(border(.53, .083), .024, light);
+    // Inset lamps follow the straight upper border of each flat panel.
+    for (const depth of [1.55, 2.5, 3.45]) {
+      box(body, [.06, .28, .55], [side * (FIELD.goalWidth - .092), FIELD.goalHeight - .33, depth], graphite);
+      box(body, [.026, .13, .36], [side * (FIELD.goalWidth - .13), FIELD.goalHeight - .33, depth], light);
     }
-    for (const y of [1.5, 3.3]) {
-      const points: T.Vector3[] = [];
-      for (let i = 0; i <= 24; i++) { const depth = i / 24 * 4.2, { bottom } = goalRadii(depth), p = sidePoint(depth); const inset = y < bottom ? bottom - Math.sqrt(Math.max(0, bottom * bottom - (bottom - y) ** 2)) : 0; points.push(new T.Vector3(side * (-p.x - inset - .035), y, depth - p.nz * inset)); }
-      rail(points, .022, gunmetal);
+    for (const y of [1.5, 3.3, 4.9]) {
+      const points = [new T.Vector3(side * (FIELD.goalWidth - .012), y, .2), new T.Vector3(side * (FIELD.goalWidth - .012), y, 5.8)];
+      rail(points, .018, gunmetal);
     }
   }
   for (const x of [-6, -3, 0, 3, 6]) {
