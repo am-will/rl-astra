@@ -5,6 +5,7 @@ import type { Pad } from './physics';
 import { detailedCar, detailedBall } from './models';
 import { arenaSurfaces, sideBoundary, honeycombMaterial } from './arena';
 import { createLargeBoostPad, createSmallBoostPad } from './boost-pad';
+import { createGoalFrame } from './goal-frame';
 
 function turfTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 1536; canvas.height = 2048;
@@ -80,9 +81,9 @@ export class Stadium {
     const apron = box(architecture, [110, 1, 130], [0, -.55, 0], material(0x182936)); apron.receiveShadow = true;
     const glass = honeycombMaterial(.045);
     this.wallMaterial = glass;
-    const { goalWidth: g, goalHeight: h, width: w, length: l, goalDepth: d } = FIELD;
+    const { goalWidth: g, width: w, length: l, goalDepth: d } = FIELD;
     const rampMat = new T.MeshStandardMaterial({ color: 0x293e49, metalness: .4, roughness: .65, side: T.DoubleSide }); fadeNearCamera(rampMat);
-    const netMats = [honeycombMaterial(.38, 1), honeycombMaterial(.38, -1)];
+    const netMats = [honeycombMaterial(.065, 1), honeycombMaterial(.065, -1)];
     for (const surface of arenaSurfaces()) {
       const goalIndex = surface.team > 0 ? 0 : 1;
       const mat = surface.kind === 'ramp' ? rampMat : surface.kind.startsWith('goal-') ? netMats[goalIndex] : glass;
@@ -120,22 +121,15 @@ export class Stadium {
       box(architecture, [.13, .12, 132], [s * 58.8, 12.95, 0], s === 1 ? blueGlow : orangeGlow);
       box(architecture, [.2, .18, 144], [s * 64.4, 17.65, 0], whiteGlow);
       box(architecture, [130, .18, .2], [0, 17.65, s * 76.4], teamMat);
-      const goalSurface = new T.MeshStandardMaterial({ color: s === 1 ? 0x102e52 : 0x4b2e1d, metalness: .3, roughness: .6 });
-      const floor = new T.Mesh(new T.PlaneGeometry(g * 2, d), goalSurface); floor.rotation.x = -Math.PI / 2; floor.position.set(0, .012, s * (l + d / 2)); floor.receiveShadow = true; scene.add(floor);
-      // Rounded crossbar and matching curved goal roof. The floor stays flush.
-      const arch: T.Vector3[] = [];
-      for (let i = 0; i <= 16; i++) arch.push(new T.Vector3(-g, (h - 1.2) * i / 16, s * l));
-      for (let i = 1; i <= 24; i++) { const a = Math.PI - i / 24 * Math.PI / 2; arch.push(new T.Vector3(-g + 1.2 + Math.cos(a) * 1.2, h - 1.2 + Math.sin(a) * 1.2, s * l)); }
-      for (let i = 1; i <= 32; i++) arch.push(new T.Vector3(T.MathUtils.lerp(-g + 1.2, g - 1.2, i / 32), h, s * l));
-      for (let i = 1; i <= 24; i++) { const a = Math.PI / 2 - i / 24 * Math.PI / 2; arch.push(new T.Vector3(g - 1.2 + Math.cos(a) * 1.2, h - 1.2 + Math.sin(a) * 1.2, s * l)); }
-      for (let i = 1; i <= 16; i++) arch.push(new T.Vector3(g, (h - 1.2) * (1 - i / 16), s * l));
-      const frameCurve = new T.CatmullRomCurve3(arch);
-      architecture.add(new T.Mesh(new T.TubeGeometry(frameCurve, 160, .15, 8, false), structural));
-      const lightFrame = new T.Mesh(new T.TubeGeometry(frameCurve, 160, .07, 8, false), teamMat); lightFrame.position.z = -s * .12; architecture.add(lightFrame);
-      box(architecture, [g * 2, .045, .09], [0, .045, s * l], whiteGlow);
-      const goalLamp = new T.PointLight(teamColor, 90, 24, 2); goalLamp.position.set(0, 4, s * (l + 2)); scene.add(goalLamp); this.goalLights.push(goalLamp);
-      const sign = new T.Mesh(new T.PlaneGeometry(21, 2.2), new T.MeshBasicMaterial({ map: labelTexture(s === 1 ? 'BLUE  /  DEFEND' : 'ORANGE  /  ATTACK', '#ffffff', s === 1 ? '#126cb8' : '#bd631f') }));
-      sign.position.set(0, h + 2.3, s * (l + .5)); sign.rotation.y = s === 1 ? Math.PI : 0; scene.add(sign);
+      const goalFrame = createGoalFrame(s); scene.add(goalFrame);
+      goalFrame.traverse(o => { if (o instanceof T.Mesh && o.material instanceof T.MeshStandardMaterial) fadeNearCamera(o.material); });
+      // Recessed stadium service tiers sit beyond the transparent goal shell.
+      // They provide a dark backdrop without putting seats or walls in the net.
+      for (let tier = 0; tier < 5; tier++) {
+        box(architecture, [g * 2 + 5, 1.25, .8], [0, .55 + tier * 1.32, s * (l + d + 3 + tier * .65)], concrete);
+        box(architecture, [g * 2 + 5, .1, .12], [0, 1.12 + tier * 1.32, s * (l + d + 2.56 + tier * .65)], structural);
+      }
+      const goalLamp = new T.PointLight(teamColor, 48, 24, 2); goalLamp.position.set(0, 4, s * (l + 2)); scene.add(goalLamp); this.goalLights.push(goalLamp);
       // Floating video boards and continuous light ribbons.
       const screen = new T.Mesh(new T.PlaneGeometry(26, 11), new T.MeshStandardMaterial({ map: labelTexture('ROCKET\u2002LEAGUE', '#ecf8ff', '#0a2443', 1024, 384), emissive: 0x8caeff, emissiveIntensity: .3 }));
       screen.position.set(s * 66, 25, 0); screen.rotation.y = -s * Math.PI / 2; scene.add(screen);

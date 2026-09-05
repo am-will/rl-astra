@@ -25,6 +25,7 @@ Barlow Condensed by Jeremy Tribby, distributed through Fontsource under the SIL 
 - [RocketSim driving and boost implementation](https://github.com/ZealanL/RocketSim/blob/main/src/Sim/Car/Car.cpp), together with its reference constants above. Reference for boost-implied throttle, the engine torque curve, supersonic thresholds, and boost acceleration. The 1.59-second acceleration figure is measured in this recreation, not a capture of the original game.
 - [Rocket League Lightspeed trail reference](https://earlygame.com/rocket-league/best-rocket-trails). Visual inspiration for independently generated wheel ribbons; no reference image or original trail asset is bundled.
 - [Rocket League in-game HUD screenshot](https://steamcommunity.com/sharedfiles/filedetails/?id=800886843). Visual reference for the compact blue/orange score tiles and asymmetric segmented boost dial. The interface and animations are independently implemented with HTML, CSS and SVG.
+- User-supplied own/opponent goal comparison image. Reference for the layered frame, recessed curved interior, team lighting, hex flooring and own-goal shields; arrow annotations were ignored. Goal geometry, materials and shield artwork are independently generated.
 - [Rapier JavaScript rigid-body documentation](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/).
 
 Rocket League, Octane, Champions Field, and associated names belong to their respective owners. This local fan recreation is not affiliated with Psyonix or Epic Games.

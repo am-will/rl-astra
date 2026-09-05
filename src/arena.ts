@@ -9,7 +9,7 @@ export interface BoundaryPoint { x: number; z: number; nx: number; nz: number; d
 type P = [number, number];
 const smooth = (x: number) => { const t = T.MathUtils.clamp(x, 0, 1); return t * t * (3 - 2 * t); };
 
-function path(points: P[], rounding: number, cornerFraction = .4): BoundaryPoint[] {
+function path(points: P[], rounding: number, cornerFraction = .4, circular = false): BoundaryPoint[] {
   const samples: P[] = [];
   const line = (a: P, b: P) => {
     const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .7));
@@ -22,7 +22,9 @@ function path(points: P[], rounding: number, cornerFraction = .4): BoundaryPoint
     const from = b.clone().addScaledVector(a.sub(b).normalize(), radius), to = b.clone().addScaledVector(c.sub(b).normalize(), radius);
     line(last, from.toArray() as P);
     for (let k = 0; k < 20; k++) {
-      const t = k / 20, p = from.clone().multiplyScalar((1 - t) ** 2).addScaledVector(b, 2 * t * (1 - t)).addScaledVector(to, t * t);
+      const t = k / 20, weight = circular ? Math.SQRT1_2 : 1;
+      const p = from.clone().multiplyScalar((1 - t) ** 2).addScaledVector(b, 2 * weight * t * (1 - t)).addScaledVector(to, t * t)
+        .divideScalar((1 - t) ** 2 + 2 * weight * t * (1 - t) + t * t);
       samples.push(p.toArray() as P);
     }
     last = to.toArray() as P;
@@ -72,8 +74,25 @@ function reverse(geometry: T.BufferGeometry) {
   geometry.computeVertexNormals(); return geometry;
 }
 
+export const GOAL_MOUTH_RADIUS = 1.35;
+export function goalRadii(depth: number) {
+  return { bottom: FIELD.rampRadius * smooth(depth / 4.2), top: T.MathUtils.lerp(GOAL_MOUTH_RADIUS, 1.8, smooth(depth / 3.5)) };
+}
+export function goalBoundary(s: number) {
+  const { goalWidth: g, length: l, goalDepth: d } = FIELD;
+  const boundary = path([[-g, l], [-g, l + d], [g, l + d], [g, l]], 4.05, .46, true)
+    .map(p => ({ ...p, x: p.x * (1 - 1.1 / g * smooth((p.z - l) / 4.2)) }));
+  let distance = 0;
+  return boundary.map((p, i) => {
+    const a = boundary[Math.max(0, i - 1)], b = boundary[Math.min(boundary.length - 1, i + 1)];
+    const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
+    if (i) distance += Math.hypot(p.x - a.x, p.z - a.z);
+    const mouth = i === 0 || i === boundary.length - 1;
+    return { ...p, z: p.z * s, nx: mouth ? Math.sign(p.x) : -dz / length, nz: mouth ? 0 : dx / length * s, distance };
+  });
+}
 export function goalArchHeight(x: number) {
-  const radius = 1.2, delta = Math.max(0, Math.abs(x) - FIELD.goalWidth + radius);
+  const radius = GOAL_MOUTH_RADIUS, delta = Math.max(0, Math.abs(x) - FIELD.goalWidth + radius);
   return FIELD.goalHeight - radius + Math.sqrt(Math.max(0, radius * radius - delta * delta));
 }
 export function arenaSurfaces(): ArenaSurface[] {
@@ -93,14 +112,15 @@ export function arenaSurfaces(): ArenaSurface[] {
     add(grid(64, 12, (u, v) => { const x = (u * 2 - 1) * g; const y = T.MathUtils.lerp(goalArchHeight(x), h - r, v); return { p: [x, y, s * l], uv: [x, y] }; }), 'wall');
     add(grid(32, 20, (u, v) => { const a = v * Math.PI / 2; return { p: [(u * 2 - 1) * g, h - r + r * Math.sin(a), s * (l - r + r * Math.cos(a))], uv: [u * g * 2, h - r + r * a] }; }), 'wall');
     if (s < 0) surfaces.slice(start).forEach(surface => reverse(surface.geometry));
-    const goal = path([[-g, l], [-g, l + d], [g, l + d], [g, l]], 4.05, .46).map(p => ({ ...p, z: p.z * s, nz: p.nz * s }));
+    const goal = goalBoundary(s);
     // Full field-sized fillets inside the net, tapering flush into the posts.
     // The wider plan-view corners leave room for the inward floor offset.
-    const goalRadius = (p: BoundaryPoint) => r * smooth((Math.abs(p.z) - l) / 4.2);
+    const radii = (p: BoundaryPoint) => goalRadii(Math.abs(p.z) - l);
+    const goalRadius = (p: BoundaryPoint) => radii(p).bottom;
     add(sweep(goal, 26, (p, v) => { const radius = goalRadius(p), a = v * Math.PI / 2; return [radius * (Math.sin(a) - 1), radius * (1 - Math.cos(a))]; }), 'goal-ramp', s);
-    add(sweep(goal, 10, (p, v) => [0, T.MathUtils.lerp(goalRadius(p), gh - 1.2, v)]), 'goal-net', s);
-    add(sweep(goal, 18, (_, v) => { const a = v * Math.PI / 2; return [1.2 * (Math.cos(a) - 1), gh - 1.2 + 1.2 * Math.sin(a)]; }), 'goal-net', s);
-    const contour = goal.map(p => new T.Vector2(p.x - p.nx * 1.2, p.z - p.nz * 1.2));
+    add(sweep(goal, 10, (p, v) => [0, T.MathUtils.lerp(goalRadius(p), gh - radii(p).top, v)]), 'goal-net', s);
+    add(sweep(goal, 24, (p, v) => { const radius = radii(p).top, a = v * Math.PI / 2; return [radius * (Math.cos(a) - 1), gh - radius + radius * Math.sin(a)]; }), 'goal-net', s);
+    const contour = goal.map(p => new T.Vector2(p.x - p.nx * radii(p).top, p.z - p.nz * radii(p).top));
     add(horizontalPolygon(contour, gh), 'goal-net', s);
   }
   const right = sideBoundary(1), left = sideBoundary(-1).reverse();
@@ -122,7 +142,7 @@ export function honeycombMaterial(opacity = .22, team = 0) {
     vertexShader: `varying vec2 vUv; varying vec3 vWorld; varying float vDistance;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vec4 mv=viewMatrix*w;vDistance=length(mv.xyz);gl_Position=projectionMatrix*mv;}`,
     fragmentShader: `varying vec2 vUv; varying vec3 vWorld; varying float vDistance; uniform float opacity;uniform float team;uniform float visibility;
-      void main(){vec2 p=vUv*.85;vec2 tile=vec2(1.,1.7320508);vec2 a=mod(p,tile)-tile*.5;vec2 b=mod(p-tile*.5,tile)-tile*.5;vec2 q=dot(a,a)<dot(b,b)?a:b;
+      void main(){vec2 p=vUv*(team!=0.?1.45:.85);vec2 tile=vec2(1.,1.7320508);vec2 a=mod(p,tile)-tile*.5;vec2 b=mod(p-tile*.5,tile)-tile*.5;vec2 q=dot(a,a)<dot(b,b)?a:b;
       float edge=.5-max(abs(q.x),dot(abs(q),vec2(.5,.8660254)));float aa=max(fwidth(edge),.002);
       float line=1.-smoothstep(.009,.009+aa,edge);float nearFade=smoothstep(1.5,4.,vDistance);
       vec3 blue=vec3(.13,.55,1.);vec3 orange=vec3(1.,.47,.13);vec3 tint=mix(orange,blue,smoothstep(-9.,9.,vWorld.z));

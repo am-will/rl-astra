@@ -18,6 +18,7 @@ npm test          # Gameplay, arena, aerial control, keyboard/controller, and se
 npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
 npm run test:speed    # Supersonic timing, momentum after ball hits, and wheel trails
 npm run test:hud      # Boost gauge, pickup feedback, scoreboard and compact layouts
+npm run test:goals # Goal scoring and actual rendered shield visibility from both sides
 npm run test:feel  # Impact calibration, goal clearance/ramp driving, camera framing and refresh rates
 npm run test:impact # Goal blast control, demolitions, subtle ball trail, clear goal net, saved quality
 npm run test:impact-visuals # Goal interior and demolition drive-through screenshots
@@ -76,6 +77,7 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 - `src/game.ts`: Fixed 120 Hz simulation, bot behavior, match lifecycle, input actions, and development-only test scenarios.
 - `src/render.ts`: Interpolated car/ball poses between 120 Hz physics steps, lighting, shadowing, bloom, and effects.
 - `src/follow-camera.ts`: Smooth angular orbit, spring distance, gradual mode transitions, two-subject ball framing, high-ball field of view, and collision avoidance against opaque ramps. Transparent arena walls do not pin the camera to the car.
+- `src/goal-frame.ts`: Layered beveled goal surrounds, recessed alloy shoulders, inset team lamps, hex-tiled sills, and three translucent own-goal shields.
 - `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
 - `src/models.ts`: Detailed Octane and ball assets, material setup, and independent wheel pivots.
 - `src/boost-pad.ts`: Low three-lobed silver housings, recessed sockets, and amber inserts. Collected large orbs contract into their sockets over 180 ms; small emitters dim and retract over 120 ms. The housing remains visible during cooldown.
@@ -91,7 +93,7 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 
 Countdown, kickoff, goals, overtime and event popups use chunky gradient lettering with black outlines and offset black shadows, matching the demolition art. Announcements animate with a short pop; reduced-motion preferences suppress that entrance.
 
-Goal interiors use 2.56-unit floor fillets, tapering flush at the mouth, with wider rounded back corners. All curved goal surfaces share transparent honeycomb; their collision shapes remain fully driveable. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
+Goal interiors use 2.56-unit floor fillets tapering flush at the mouth, gently narrowing side walls, rounded rear corner profiles, and roof curves that broaden into the goal. The visible net and collision shell share this geometry. Curved rear surfaces retain fine transparent honeycomb, with a flush alloy collar near the entrance. Three faint shields mark the blue own goal from the field side only. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
 
 Goal celebrations keep the cars and all driving/aerial inputs active. The blast launches nearby cars more strongly and fades with distance; the match clock and scored ball stay stopped until the next kickoff. Demolished cars are temporarily disabled in place so the camera remains above the field before respawn.
 
