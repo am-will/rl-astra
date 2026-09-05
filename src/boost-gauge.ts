@@ -1,4 +1,4 @@
-const START = 92, SWEEP = 258, CENTER = 110;
+const START = 92, SWEEP = 230, CENTER = 110;
 const point = (radius: number, angle: number) => {
   const a = angle * Math.PI / 180;
   return `${(CENTER + Math.cos(a) * radius).toFixed(3)} ${(CENTER + Math.sin(a) * radius).toFixed(3)}`;
@@ -6,9 +6,29 @@ const point = (radius: number, angle: number) => {
 const arc = (radius: number) => `M ${point(radius, START)} A ${radius} ${radius} 0 1 1 ${point(radius, START + SWEEP)}`;
 const segments = Array.from({ length: 52 }, (_, i) => {
   const start = START + i * SWEEP / 52, end = start + SWEEP / 52 - 1.5;
-  const outer = 82 + i / 51 * 16;
+  const outer = 81 + i / 51 * 24;
   return `<path d="M ${point(74, start)} L ${point(outer, start)} A ${outer} ${outer} 0 0 1 ${point(outer, end)} L ${point(74, end)} A 74 74 0 0 0 ${point(74, start)} Z"/>`;
 }).join('');
+
+// Wide, lightly rounded single-line numerals echo the reference instrument.
+const digits: Record<string, string> = {
+  '0': 'M8 3 H40 Q45 3 45 8 V43 Q45 48 40 48 H8 Q3 48 3 43 V8 Q3 3 8 3 Z',
+  '1': 'M3 12 L17 3 V48',
+  '2': 'M3 10 Q3 3 10 3 H38 Q45 3 45 10 V18 Q45 23 38 26 L9 38 Q3 41 3 48 H45',
+  '3': 'M3 3 H38 Q45 3 45 10 V18 Q45 25 38 25 H14 M38 25 Q45 25 45 32 V41 Q45 48 38 48 H3',
+  '4': 'M35 48 V3 L3 32 H45',
+  '5': 'M45 3 H3 V25 H38 Q45 25 45 32 V41 Q45 48 38 48 H3',
+  '6': 'M44 3 H10 Q3 3 3 10 V41 Q3 48 10 48 H38 Q45 48 45 41 V32 Q45 25 38 25 H3',
+  '7': 'M3 3 H45 L20 48',
+  '8': 'M10 25 Q3 25 3 18 V10 Q3 3 10 3 H38 Q45 3 45 10 V18 Q45 25 38 25 Z M10 25 Q3 25 3 32 V41 Q3 48 10 48 H38 Q45 48 45 41 V32 Q45 25 38 25',
+  '9': 'M4 48 H38 Q45 48 45 41 V10 Q45 3 38 3 H10 Q3 3 3 10 V18 Q3 25 10 25 H45',
+  '∞': 'M40 26 C27 6 3 9 3 26 C3 44 27 46 40 26 C53 6 77 9 77 26 C77 44 53 46 40 26',
+};
+function numerals(value: string) {
+  let x = 0;
+  const paths = [...value].map(digit => { const path = `<path transform="translate(${x} 0)" d="${digits[digit]}"/>`; x += digit === '1' ? 23 : digit === '∞' ? 80 : 52; return path; }).join('');
+  return `<span class="boost-number-text">${value}</span><svg viewBox="0 0 ${x} 51" style="width:${x / 51}em" aria-hidden="true">${paths}</svg>`;
+}
 
 /** SVG instrument: only the two fill masks and the fuel tip change each frame. */
 export class BoostGauge {
@@ -28,9 +48,9 @@ export class BoostGauge {
       <div class="boost-well"></div><div class="boost-heat"></div>
       <svg class="boost-dial" viewBox="0 0 220 220" aria-hidden="true">
         <defs>
-          <linearGradient id="boost-gold" x1="15%" y1="100%" x2="85%" y2="0%"><stop stop-color="#e66e12"/><stop offset=".42" stop-color="#ffa82c"/><stop offset=".78" stop-color="#ffd263"/><stop offset="1" stop-color="#fff3be"/></linearGradient>
-          <mask id="boost-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="220" height="220"><path id="boost-arc" d="${arc(86)}" fill="none" stroke="white" stroke-width="34" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></mask>
-          <mask id="boost-lag-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="220" height="220"><path id="boost-lag-arc" d="${arc(86)}" fill="none" stroke="white" stroke-width="34" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></mask>
+          <linearGradient id="boost-gold" x1="0%" y1="65%" x2="85%" y2="0%"><stop stop-color="#efa938"/><stop offset=".48" stop-color="#ffdc74"/><stop offset=".7" stop-color="#ffe69f"/><stop offset=".74" stop-color="#ffae95"/><stop offset="1" stop-color="#ffd2c3"/></linearGradient>
+          <mask id="boost-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="220" height="220"><path id="boost-arc" d="${arc(86)}" fill="none" stroke="white" stroke-width="40" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></mask>
+          <mask id="boost-lag-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="220" height="220"><path id="boost-lag-arc" d="${arc(86)}" fill="none" stroke="white" stroke-width="40" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></mask>
         </defs>
         <path class="boost-rail" d="${arc(69)}"/>
         <path class="boost-rail outer" d="${arc(102)}"/>
@@ -42,7 +62,7 @@ export class BoostGauge {
         <path class="boost-sonic-ring" d="${arc(64)}" pathLength="100"/>
         <path class="boost-recharge-ring" d="${arc(102)}"/>
       </svg>
-      <div class="boost-value"><strong id="boost">100</strong><span>BOOST</span></div>
+      <div class="boost-value"><strong id="boost">${numerals('100')}</strong><span>BOOST</span></div>
       <div class="boost-pickup" aria-hidden="true"></div>
       <div class="boost-sonic" aria-hidden="true"><i></i><i></i><i></i></div>
     </div><div class="speed"><span id="speed">0</span><span class="speed-unit">KM/H</span><i></i><span id="drive-state">GROUNDED</span></div>`;
@@ -73,7 +93,7 @@ export class BoostGauge {
     if (Math.abs(target - this.displayed) < .03) this.displayed = target;
     if (Math.abs(this.displayed - this.trailing) < .03) this.trailing = this.displayed;
     const text = unlimited ? '∞' : String(Math.ceil(amount));
-    if (this.value.textContent !== text) this.value.textContent = text;
+    if (this.value.textContent !== text) this.value.innerHTML = numerals(text);
     this.fill.style.strokeDashoffset = (100 - this.displayed).toFixed(3);
     this.lag.style.strokeDashoffset = (100 - Math.max(this.displayed, this.trailing)).toFixed(3);
     this.tip.setAttribute('transform', `rotate(${START + SWEEP * this.displayed / 100} 110 110)`);

@@ -68,6 +68,7 @@ export class GameRenderer {
     this.effects = new Effects(this.scene);
     this.boosts = [new RocketBoost(this.scene), new RocketBoost(this.scene)];
     this.speedTrails = [new SpeedTrails(this.scene), new SpeedTrails(this.scene, true)];
+    this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
     this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
     this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
@@ -84,6 +85,7 @@ export class GameRenderer {
     old.forEach(o => this.scene.remove(o)); replacement.forEach(o => this.scene.add(o));
     this.scene.children.filter(o => o.name === 'contact-shadow').forEach(o => { const index = old.indexOf(o.userData.owner); if (index >= 0) o.userData.owner = replacement[index]; });
     this.stadium.addMonument(source.car, source.ball);
+    this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
     old.forEach(root => root.traverse(o => { if (o instanceof T.Mesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } }));
     this.update(0, 'ready');
   }

@@ -21,7 +21,7 @@ export class HUD {
     this.root.innerHTML = `
       <div class="vignette"></div>
       <header class="identity">${shield}<div class="wordmark">ROCKET<br>LEAGUE</div><span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> NIGHT <span>·</span> LOCAL MATCH</span></div></header>
-      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">0</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">5:00</strong></div><div class="team team-orange"><strong id="orange-score">0</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
+      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">0</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">5:00</strong><b class="practice-label">FREE PLAY</b></div><div class="team team-orange"><strong id="orange-score">0</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
       <nav class="top-actions" aria-label="Game settings"><span class="live-label"><i></i> LOCAL PLAY</span><button data-action="sound" aria-label="Toggle sound" title="Toggle sound (M)">${icon('sound')}</button><button data-action="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">${icon('expand')}</button><button data-action="pause" aria-label="Pause game" title="Pause (Esc)">${icon('pause')}</button></nav>
       <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
@@ -46,7 +46,7 @@ export class HUD {
       ['Drive / steer', ['forward', 'reverse', 'left', 'right']], ['Jump · hold for height / recover', ['jump']],
       ['Rocket boost', ['boost']], ['Air pitch / yaw', ['pitchDown', 'pitchUp', 'yawLeft', 'yawRight']],
       ['Air roll left / right', ['rollLeft', 'rollRight']], ['Air roll modifier', ['airRoll']],
-      ['E-brake / powerslide', ['drift']], ['Ball camera', ['camera']], ['Unlimited boost', ['unlimited']], ['Reset car', ['reset']], ['Restart match', ['restart']], ['Pause / sound / fullscreen', ['pause', 'sound', 'fullscreen']],
+      ['E-brake / powerslide', ['drift']], ['Ball camera', ['camera']], ['Unlimited boost', ['unlimited']], ['Reset car', ['reset']], ['Restart match', ['restart']], ['Toggle practice', ['mode']], ['Pause / sound / fullscreen', ['pause', 'sound', 'fullscreen']],
     ];
     const list = this.root.querySelector('.control-list')!; list.replaceChildren();
     for (const [name, ids] of rows) {
@@ -89,14 +89,14 @@ export class HUD {
   }
   toast(text: string) { this.set('event-toast', text); this.el('event-toast').classList.add('visible'); this.messageUntil = performance.now() + 2200; }
   boostPickup(big: boolean) { this.boostGauge.pickup(big); }
-  update(data: { blue: number; orange: number; time: number; boost: number; boosting: boolean; speed: number; supersonic: boolean; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; }, dt = 1 / 60) {
+  update(data: { blue: number; orange: number; time: number; boost: number; boosting: boolean; speed: number; supersonic: boolean; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; practice?: boolean; }, dt = 1 / 60) {
     this.set('blue-score', data.blue); this.set('orange-score', data.orange);
     const t = Math.ceil(Math.abs(data.time)); this.set('timer', `${data.overtime ? '+' : ''}${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`);
-    this.el('overtime').style.display = data.overtime ? 'block' : 'none';
+    this.el('overtime').style.display = data.overtime && !data.practice ? 'block' : 'none';
     const scoreboard = this.root.querySelector('.scoreboard')!;
-    scoreboard.classList.toggle('is-overtime', data.overtime);
-    scoreboard.classList.toggle('is-urgent', data.time <= 30 && !data.overtime);
-    scoreboard.classList.toggle('is-final-seconds', data.time <= 10 && !data.overtime);
+    scoreboard.classList.toggle('is-overtime', data.overtime && !data.practice);
+    scoreboard.classList.toggle('is-urgent', data.time <= 30 && !data.overtime && !data.practice);
+    scoreboard.classList.toggle('is-final-seconds', data.time <= 10 && !data.overtime && !data.practice);
     this.boostGauge.update(data.boost, data.unlimited, data.boosting, data.supersonic, dt);
     this.set('speed', Math.round(data.speed * 3.6)); this.set('drive-state', data.grounded ? 'GROUNDED' : 'AIRBORNE');
     this.set('player-status', data.supersonic ? 'SUPERSONIC' : data.grounded ? 'OCTANE · BLUE TEAM' : 'OCTANE · AIRBORNE');
@@ -106,6 +106,8 @@ export class HUD {
   }
   camera(active: boolean) { this.set('camera-status', active ? 'ON' : 'OFF'); this.el('camera-indicator').classList.toggle('active', active); }
   mode(bot: boolean) {
+    this.root.querySelector('.scoreboard')!.classList.toggle('is-practice', !bot);
+    this.el('timer').hidden = !bot;
     this.root.querySelector('.team-orange>span')!.textContent = bot ? 'MAVERICK' : 'ORANGE';
     this.root.querySelector('.session-footer>span:nth-child(2)')!.textContent = bot ? 'EXHIBITION' : 'SOLO PRACTICE';
   }

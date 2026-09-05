@@ -1,11 +1,11 @@
 import * as T from 'three';
 import { FIELD } from './config';
-import { GOAL_MOUTH_RADIUS, goalSideProfile } from './arena';
+import { GOAL_MOUTH_RADIUS, GOAL_PROFILE, goalSideProfile } from './arena';
 import { box, material, mergeStatic } from './assets';
 
 // The entrance arch is independent of the depth/height U-shaped side border.
 function section(depth: number, outset = 0) {
-  const w = FIELD.goalWidth + outset, h = FIELD.goalHeight + outset;
+  const w = FIELD.goalWidth + outset, h = FIELD.goalHeight + outset - depth * (FIELD.goalHeight - GOAL_PROFILE.upperEnd.y) / GOAL_PROFILE.upperEnd.x;
   const b = .001, r = GOAL_MOUTH_RADIUS + outset, left: T.Vector3[] = [];
   for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI / 2; left.push(new T.Vector3(-w + b - b * Math.sin(a), b * (1 - Math.cos(a)), depth)); }
   for (let i = 1; i <= 12; i++) left.push(new T.Vector3(-w, T.MathUtils.lerp(b, h - r, i / 12), depth));
@@ -55,8 +55,11 @@ export function createGoalFrame(team: number) {
     c.strokeStyle = team > 0 ? '#356a91' : '#936138'; c.lineWidth = 2; c.stroke();
   }
   const tiles = new T.CanvasTexture(canvas); tiles.colorSpace = T.SRGBColorSpace; tiles.wrapS = tiles.wrapT = T.RepeatWrapping; tiles.repeat.set(1.8, 1.8); tiles.anisotropy = 8;
-  const floor = new T.Mesh(new T.PlaneGeometry(FIELD.goalWidth * 2 + 3, FIELD.goalDepth + 3.8), new T.MeshStandardMaterial({ map: tiles, color: 0x8296a5, metalness: .18, roughness: .74, envMapIntensity: .35 }));
-  floor.name = 'goal-hex-floor'; floor.rotation.x = -Math.PI / 2; floor.position.set(0, .018, (FIELD.goalDepth - 3.8) / 2); floor.receiveShadow = true; root.add(floor);
+  const floor = new T.Mesh(new T.PlaneGeometry(FIELD.goalWidth * 2 + 3, FIELD.goalDepth + 3.8, 1, 32), new T.MeshStandardMaterial({ map: tiles, color: 0x8296a5, metalness: .18, roughness: .74, envMapIntensity: .35 }));
+  floor.name = 'goal-hex-floor'; floor.geometry.rotateX(-Math.PI / 2); floor.geometry.translate(0, .018, (FIELD.goalDepth - 3.8) / 2);
+  const floorPoints = floor.geometry.attributes.position;
+  for (let i = 0; i < floorPoints.count; i++) floorPoints.setY(i, .018 + T.MathUtils.clamp(floorPoints.getZ(i) / GOAL_PROFILE.lowerEnd.x, 0, 1) * GOAL_PROFILE.lowerEnd.y);
+  floor.geometry.computeVertexNormals(); floor.receiveShadow = true; root.add(floor);
   const graphite = material(0x101923, .72, .37), gunmetal = material(0x354553, .8, .33), alloy = material(0x8c9aa1, .7, .4);
   for (const mat of [graphite, gunmetal, alloy]) mat.side = T.DoubleSide;
   const light = new T.MeshBasicMaterial({ color: team > 0 ? 0x087cff : 0xff790b, side: T.DoubleSide, toneMapped: false });
@@ -83,10 +86,11 @@ export function createGoalFrame(team: number) {
     rail(border(.53, .083), .024, light);
     // Inset lamps follow the straight upper border of each flat panel.
     for (const depth of [1.55, 2.5, 3.45]) {
-      box(body, [.06, .28, .55], [side * (FIELD.goalWidth - .092), FIELD.goalHeight - .33, depth], graphite);
-      box(body, [.026, .13, .36], [side * (FIELD.goalWidth - .13), FIELD.goalHeight - .33, depth], light);
+      const y = FIELD.goalHeight - depth * (FIELD.goalHeight - GOAL_PROFILE.upperEnd.y) / GOAL_PROFILE.upperEnd.x - .33;
+      box(body, [.06, .28, .55], [side * (FIELD.goalWidth - .092), y, depth], graphite);
+      box(body, [.026, .13, .36], [side * (FIELD.goalWidth - .13), y, depth], light);
     }
-    for (const y of [1.5, 3.3, 4.9]) {
+    for (const y of [1.5, 3.3]) {
       const points = [new T.Vector3(side * (FIELD.goalWidth - .012), y, .2), new T.Vector3(side * (FIELD.goalWidth - .012), y, 5.8)];
       rail(points, .018, gunmetal);
     }

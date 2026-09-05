@@ -23,7 +23,7 @@ try {
   await page.keyboard.up('w');
   let s = await run(() => window.__game.snapshot());
   check('Real keyboard starts match and drives', s.car.z < 25 && s.remaining < 300, s.car);
-  await page.keyboard.press('p');
+  await page.keyboard.press('Escape');
   const frozen = await run(() => window.__game.snapshot());
   await page.waitForTimeout(450);
   check('Pause freezes simulation and timer', await run(t => window.__game.remaining === t && window.__game.paused, frozen.remaining), frozen.remaining);

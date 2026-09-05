@@ -65,7 +65,7 @@ try {
   await page.screenshot({path:'test-results/controls-options.png'});
   const overflow=await page.evaluate(()=>{const panel=document.querySelector('.bindings-menu');return{width:panel.clientWidth,scroll:panel.scrollWidth};});check('Options panel has no horizontal overflow',overflow.width===overflow.scroll,overflow);
   await page.locator('.bindings-close').click();await tap(9);check('Options resumes from the controller',!(await page.locator('#pause-panel').isVisible()));
-  await page.keyboard.press('p');check('Keyboard P opens pause',await page.locator('#pause-panel').isVisible());await page.keyboard.press('p');check('Keyboard P resumes from pause',!(await page.locator('#pause-panel').isVisible()));
+  await page.keyboard.press('Escape');check('Keyboard Escape opens pause',await page.locator('#pause-panel').isVisible());await page.keyboard.press('Escape');check('Keyboard Escape resumes from pause',!(await page.locator('#pause-panel').isVisible()));
   await page.keyboard.down('i');input=await read();await page.keyboard.up('i');check('Rebound keyboard acceleration works',input.throttle===1,input);
   await page.keyboard.down('w');input=await read();await page.keyboard.up('w');check('Old keyboard acceleration is removed',input.throttle===0,input);
   await button(5);input=await read();check('Rebound R1 activates boost',input.boost,input);await page.keyboard.press('Escape');await page.keyboard.press('Escape');input=await read();check('Held controls do not leak through pause/resume',!input.boost,input);await button(5,0);

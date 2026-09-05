@@ -73,18 +73,27 @@ function reverse(geometry: T.BufferGeometry) {
 }
 
 export const GOAL_MOUTH_RADIUS = 1.35;
-export const GOAL_REAR_RADIUS = 2.56;
-// Side elevation in depth/height coordinates. Extruding this U across x gives
-// parallel planar side panels and a back curved only in the depth/height plane.
+// Estimated from the side reference: the upper arm slopes down about 16 degrees
+// into the goal, while the sill rises only about 2.5 degrees. The side panels
+// remain planar; this asymmetric profile is extruded across the full width.
+export const GOAL_PROFILE = { lowerEnd: new T.Vector2(5.7, .25), back: new T.Vector2(FIELD.goalDepth, 2.4), upperEnd: new T.Vector2(5.9, 4.72) };
 export function goalSideProfile(inset = 0): T.Vector2[] {
-  const { goalDepth: d, goalHeight: h } = FIELD, r = GOAL_REAR_RADIUS, radius = r - inset;
+  const { lowerEnd: lower, back, upperEnd: upper } = GOAL_PROFILE;
   const points: T.Vector2[] = [];
-  for (let i = 0; i <= 16; i++) points.push(new T.Vector2((d - r) * i / 16, inset));
-  for (let i = 1; i <= 32; i++) { const a = i / 32 * Math.PI / 2; points.push(new T.Vector2(d - r + radius * Math.sin(a), r - radius * Math.cos(a))); }
-  for (let i = 1; i <= 12; i++) points.push(new T.Vector2(d - inset, T.MathUtils.lerp(r, h - r, i / 12)));
-  for (let i = 1; i <= 32; i++) { const a = i / 32 * Math.PI / 2; points.push(new T.Vector2(d - r + radius * Math.cos(a), h - r + radius * Math.sin(a))); }
-  for (let i = 1; i <= 16; i++) points.push(new T.Vector2((d - r) * (1 - i / 16), h - inset));
-  return points;
+  for (let i = 0; i <= 20; i++) points.push(lower.clone().multiplyScalar(i / 20));
+  const lowerCurve = new T.CubicBezierCurve(lower, lower.clone().add(new T.Vector2(1.8, 1.8 * lower.y / lower.x)), back.clone().add(new T.Vector2(0, -1.45)), back);
+  const upperSlope = (FIELD.goalHeight - upper.y) / upper.x;
+  const upperCurve = new T.CubicBezierCurve(back, back.clone().add(new T.Vector2(0, 1.4)), upper.clone().add(new T.Vector2(1.75, -1.75 * upperSlope)), upper);
+  for (let i = 1; i <= 36; i++) points.push(lowerCurve.getPoint(i / 36));
+  for (let i = 1; i <= 36; i++) points.push(upperCurve.getPoint(i / 36));
+  for (let i = 1; i <= 20; i++) points.push(upper.clone().lerp(new T.Vector2(0, FIELD.goalHeight), i / 20));
+  if (!inset) return points;
+  return points.map((p, i) => {
+    const tangent = points[Math.min(points.length - 1, i + 1)].clone().sub(points[Math.max(0, i - 1)]).normalize();
+    const result = p.clone().addScaledVector(new T.Vector2(-tangent.y, tangent.x), inset);
+    if (i === 0 || i === points.length - 1) result.x = 0;
+    return result;
+  });
 }
 export function goalArchHeight(x: number) {
   const radius = GOAL_MOUTH_RADIUS, delta = Math.max(0, Math.abs(x) - FIELD.goalWidth + radius);
@@ -117,8 +126,8 @@ export function arenaSurfaces(): ArenaSurface[] {
       });
       return s > 0 ? reverse(geometry) : geometry;
     };
-    add(wrap(profile.filter(p => p.y <= GOAL_REAR_RADIUS + 1e-6 && p.x >= d - GOAL_REAR_RADIUS - 1e-6)), 'goal-ramp', s);
-    add(wrap(profile.filter(p => p.y >= GOAL_REAR_RADIUS - 1e-6)), 'goal-net', s);
+    add(wrap(profile.filter(p => p.y <= GOAL_PROFILE.back.y + 1e-6)), 'goal-ramp', s);
+    add(wrap(profile.filter(p => p.y >= GOAL_PROFILE.back.y - 1e-6)), 'goal-net', s);
     for (const side of [-1, 1]) {
       const geometry = new T.ShapeGeometry(new T.Shape(profile));
       const positions = geometry.getAttribute('position');

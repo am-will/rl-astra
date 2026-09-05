@@ -76,7 +76,7 @@ try {
       const visible = trail.mesh.visible, geometry = trail.mesh.geometry;
       const vertices = geometry.getAttribute('position'), birth = geometry.getAttribute('born'), now = trail.mesh.material.uniforms.time.value;
       let length = 0;
-      for (let i = 0; i < vertices.count; i++) if (now - birth.getX(i) < .18) length = Math.max(length, vertices.getZ(i) - pos.z - .56);
+      for (let i = 0; i < vertices.count; i++) if (now - birth.getX(i) < .18) length = Math.max(length, vertices.getZ(i) - pos.z - trail.origin.z);
       const finite = Array.from(vertices.array).every(Number.isFinite), before = [...vertices.array];
       trail.update(pos, q, 23, true, true, 0);
       const paused = before.every((n, i) => n === vertices.array[i]);
@@ -90,6 +90,20 @@ try {
   });
   check('Wheel ribbons remain finite, pause cleanly and clear on teleport/demo', trails.every(r => r.visible && r.finite && r.paused && r.teleportSafe && r.demoClears), trails);
   check('Ribbon length stays consistent across 30/60/144 Hz', trails.every(r => r.length > 3.8 && r.length < 4.2), trails);
+  const alignment = await page.evaluate(async () => {
+    const T = await import('/node_modules/.vite/deps/three.js'), { SpeedTrails } = await import('/src/speed-trails.ts');
+    const { createCarModel } = await import('/src/assets.ts'), { loadDetailedModels, detailedCar } = await import('/src/models.ts');
+    const fallback = createCarModel('blue'); fallback.root.scale.setScalar(.5);
+    const detailed = detailedCar((await loadDetailedModels()).car, 'blue'), rows = [];
+    for (const [name, model] of [['fallback', fallback], ['detailed', detailed]]) {
+      const trail = new SpeedTrails(new T.Scene()); trail.configureWheels(model);
+      model.root.updateMatrixWorld(true);
+      const bounds = model.wheels.map(w => new T.Box3().setFromObject(w)).sort((a,b) => b.min.z - a.min.z).slice(0,2).sort((a,b) => a.min.x - b.min.x);
+      rows.push({ name, tires: bounds.map((b,i) => ({ centered: Math.abs(trail.wheelX[i] - (b.min.x+b.max.x)/2) < .001, narrower: trail.wheelWidth[i]*2 < (b.max.x-b.min.x)*.8, underTread: trail.origin.y > b.min.y && trail.origin.y < b.min.y+.05 && trail.origin.z > b.min.z && trail.origin.z < b.max.z, width: trail.wheelWidth[i]*2, origin: trail.origin.toArray() })) });
+    }
+    return rows;
+  });
+  check('Both car models align narrow ribbon starts beneath each rear tire', alignment.every(r => r.tires.every(t => t.centered && t.narrower && t.underTread)), alignment);
   check('No browser errors', errors.length === 0, errors);
   await mkdir('test-results/speed-trails', { recursive: true });
   await writeFile('test-results/speed-trails/behavior.json', JSON.stringify({ results, errors }, null, 2));

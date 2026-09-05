@@ -17,6 +17,8 @@
 .scoreboard.is-urgent #timer{color:#ffd193}.scoreboard.is-final-seconds #timer{color:#ff8367}
 .scoreboard.is-final-seconds .clock{border-bottom-color:#ff7656}
 
+.practice-label{display:none;font:700 27px/1 Barlow,sans-serif;letter-spacing:1px;color:#e7f4ff}.scoreboard.is-practice .practice-label{display:block}.scoreboard.is-practice #timer{display:none}.scoreboard.is-practice .clock:after{background:#64c8ff80}
+
 /* Segmented boost instrument: an asymmetric fan with a clear lower-right opening. */
 .boost-hud{position:absolute;right:26px;bottom:35px;width:214px;--fuel:#ffbd50;--hot:#fff0bb;--fuel-glow:#ffad3059;--sonic:#6bdcff}
 .boost-ring{position:relative;width:100%;aspect-ratio:1;isolation:isolate}
@@ -28,9 +30,11 @@
 .boost-flow{fill:none;stroke:#fff8d1;stroke-width:3;stroke-dasharray:1.1 9;stroke-linecap:round;opacity:0}
 .boost-hot-rail{fill:none;stroke:var(--fuel);stroke-width:1.1;opacity:.4}
 .boost-tip{fill:var(--hot);filter:drop-shadow(0 0 3px var(--fuel-glow))}.tip-flare{fill:none;stroke:var(--hot);stroke-width:1;opacity:.65}
-.boost-value{position:absolute;inset:30% 14% 24%;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.boost-value strong{font:700 66px/.95 Barlow,'DIN Condensed',sans-serif;letter-spacing:-1.5px;color:#fff9eb;font-variant-numeric:tabular-nums;transform-origin:50% 65%;text-shadow:0 2px 3px #0007}
-.boost-value>span{margin-top:6px;font-size:9px;font-weight:700;letter-spacing:3.4px;padding-left:3.4px;color:#eab978}
+.boost-value{position:absolute;inset:32% 7% 25%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.boost-value strong{font:400 48px/1 sans-serif;letter-spacing:0;color:#fff9eb;font-variant-numeric:tabular-nums;transform-origin:50% 65%;text-shadow:0 2px 3px #0007}
+.boost-value svg{display:block;height:1em;max-width:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 2px #ffbf7850)}
+.boost-number-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.boost-value>span{margin-top:6px;font-size:12px;font-weight:400;letter-spacing:.5px;padding-left:.5px;color:#eab978}
 .boost-pickup{position:absolute;right:8%;bottom:20%;font:700 18px/1 Barlow,sans-serif;letter-spacing:1px;color:#ffe9b4;text-shadow:0 1px 4px #17121a;opacity:0}
 .boost-recharge-ring{fill:none;stroke:#ffe0a0;stroke-width:2;opacity:0;transform-origin:110px 110px}
 .boost-sonic-ring{fill:none;stroke:var(--sonic);stroke-width:1;stroke-dasharray:5 2;opacity:0;transition:opacity .15s}
@@ -45,15 +49,17 @@
 .boost-hud.is-low{--fuel:#ff7941;--hot:#ffc48c;--fuel-glow:#ff642a55}.boost-hud.is-low .boost-segments.fuel{fill:#ff914c}.boost-hud.is-low .boost-value>span{color:#ff9c69}
 .boost-hud.is-empty .boost-value strong{color:#b7bbc1}.boost-hud.is-empty .boost-value>span{color:#a99b89}.boost-hud.is-empty .boost-hot-rail{opacity:0}
 .boost-hud.is-supersonic .boost-sonic-ring{opacity:.7}.boost-hud.is-supersonic .boost-sonic{opacity:1}.boost-hud.is-supersonic #speed{color:var(--sonic)}
-.boost-hud.is-unlimited .boost-value strong{font-size:76px;letter-spacing:0}
+
 .boost-hud.is-paused *{animation-play-state:paused!important}
 @keyframes boost-flow{to{stroke-dashoffset:-20.2}}
 @keyframes boost-breathe{to{opacity:.5;transform:scale(.98)}}
-@media(min-width:1700px){.scoreboard{width:374px;top:20px}.scoreboard-main{grid-template-columns:100px 174px 100px;height:86px}.team strong{font-size:59px}.clock>strong{font-size:50px}.boost-hud{width:240px;right:34px;bottom:39px}.boost-value strong{font-size:74px}.boost-hud.is-unlimited .boost-value strong{font-size:84px}}
-@media(max-width:1000px){.scoreboard{width:286px;top:12px}.scoreboard-main{grid-template-columns:76px 134px 76px;height:68px}.team strong{font-size:46px}.clock>strong{font-size:40px}.team-label{font-size:7px}.clock>span{font-size:6px}.boost-hud{width:182px;right:16px;bottom:37px}.boost-value strong{font-size:57px}.boost-hud.is-unlimited .boost-value strong{font-size:64px}}
-@media(max-width:650px){.scoreboard{width:228px;top:10px}.scoreboard-main{grid-template-columns:61px 106px 61px;height:60px}.team strong{font-size:39px}.team-label{font-size:6px;letter-spacing:.8px}.clock>strong{font-size:35px}.clock>span{font-size:5px;letter-spacing:1px}.clock:after{bottom:4px}.team{border-bottom-width:2px}.clock{border-bottom-width:2px}.boost-hud{width:150px;right:8px;bottom:56px}.boost-value strong{font-size:47px}.boost-hud.is-unlimited .boost-value strong{font-size:54px}.boost-value>span{font-size:7px;letter-spacing:2px;margin-top:4px}.boost-pickup{font-size:14px}.boost-sonic i{width:6px;height:5px}.speed{gap:3px}.speed i{margin:0 2px}#speed{font-size:13px}#drive-state{font-size:5px;letter-spacing:.8px}}
-@media(max-width:390px){.scoreboard{width:210px}.scoreboard-main{grid-template-columns:56px 98px 56px}.boost-hud{width:134px;right:5px}.boost-value strong{font-size:43px}.boost-hud.is-unlimited .boost-value strong{font-size:48px}}
+@media(min-width:1700px){.scoreboard{width:374px;top:20px}.scoreboard-main{grid-template-columns:100px 174px 100px;height:86px}.team strong{font-size:59px}.clock>strong{font-size:50px}.boost-hud{width:240px;right:34px;bottom:39px}.boost-value strong{font-size:54px}}
+@media(max-width:1000px){.scoreboard{width:286px;top:12px}.scoreboard-main{grid-template-columns:76px 134px 76px;height:68px}.team strong{font-size:46px}.clock>strong{font-size:40px}.team-label{font-size:7px}.clock>span{font-size:6px}.boost-hud{width:182px;right:16px;bottom:37px}.boost-value strong{font-size:42px}}
+@media(max-width:650px){.scoreboard{width:228px;top:10px}.scoreboard-main{grid-template-columns:61px 106px 61px;height:60px}.team strong{font-size:39px}.team-label{font-size:6px;letter-spacing:.8px}.clock>strong{font-size:35px}.clock>span{font-size:5px;letter-spacing:1px}.clock:after{bottom:4px}.team{border-bottom-width:2px}.clock{border-bottom-width:2px}.boost-hud{width:150px;right:8px;bottom:56px}.boost-value strong{font-size:34px}.boost-value>span{font-size:7px;letter-spacing:2px;margin-top:4px}.boost-pickup{font-size:14px}.boost-sonic i{width:6px;height:5px}.speed{gap:3px}.speed i{margin:0 2px}#speed{font-size:13px}#drive-state{font-size:5px;letter-spacing:.8px}}
+@media(max-width:390px){.scoreboard{width:210px}.scoreboard-main{grid-template-columns:56px 98px 56px}.boost-hud{width:134px;right:5px}.boost-value strong{font-size:31px}}
 @media(max-width:650px){.bottom-left{bottom:78px}.controls-strip{bottom:14px}}
 @media(max-width:430px){.top-actions [data-action="fullscreen"]{display:none}}
-@media(max-height:600px) and (min-width:651px){.scoreboard{top:8px}.scoreboard-main{height:58px}.team strong{font-size:39px}.clock>strong{font-size:35px}.clock>span{font-size:6px}.boost-hud{width:153px;bottom:22px;right:16px}.boost-value strong{font-size:48px}.boost-hud.is-unlimited .boost-value strong{font-size:55px}.boost-value>span{font-size:7px}.boost-sonic i{width:6px;height:5px}}
+@media(max-height:600px) and (min-width:651px){.scoreboard{top:8px}.scoreboard-main{height:58px}.team strong{font-size:39px}.clock>strong{font-size:35px}.clock>span{font-size:6px}.boost-hud{width:153px;bottom:22px;right:16px}.boost-value strong{font-size:35px}.boost-value>span{font-size:7px}.boost-sonic i{width:6px;height:5px}}
 @media(prefers-reduced-motion:reduce){.boost-hud *{animation:none!important;transition:none!important}.boost-flow{display:none}}
+
+@media(max-width:650px){.practice-label{font-size:20px}}

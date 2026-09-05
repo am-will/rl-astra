@@ -15,7 +15,7 @@ export class Game {
   blue = 0; orange = 0; remaining = MATCH_LENGTH; overtime = false;
   phaseTime = 0; elapsed = 0; accumulator = 0; previous = 0; fps = 60;
   celebration = new Vector3(); lastCountdown = 0; goalCount = 0; hits = 0; padCount = 0;
-  testing = false;
+  testing = false; practice = false;
   private goalBlastPending = false;
   async init() {
     await this.physics.init();
@@ -65,7 +65,7 @@ export class Game {
     if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = this;
     requestAnimationFrame(t => this.frame(t));
   }
-  kickoff() { this.view.effects.explosion.reset(); this.view.effects.demolitions.reset(); this.goalBlastPending = false; this.phase = 'countdown'; this.phaseTime = 3; this.lastCountdown = 0; this.hud.message('3', 'GET READY', 'CHAMPIONS FIELD', 'countdown'); }
+  kickoff() { this.view.effects.explosion.reset(); this.view.effects.demolitions.reset(); this.goalBlastPending = false; if (this.practice) { this.phase = 'playing'; this.phaseTime = 0; this.hud.message(''); return; } this.phase = 'countdown'; this.phaseTime = 3; this.lastCountdown = 0; this.hud.message('3', 'GET READY', 'CHAMPIONS FIELD', 'countdown'); }
   action(action: string) {
     this.view.audio.init();
     if (action === 'camera') { this.view.ballCam = !this.view.ballCam; this.hud.camera(this.view.ballCam); }
@@ -82,7 +82,7 @@ export class Game {
     if (action === 'resume') { if (this.phase === 'ended') this.restart(); this.paused = false; this.hud.pause(false); this.controls.clear(); }
     if (action === 'restart') this.restart();
     if (action === 'reset' && !this.paused && !this.help && !this.controlsMenu.visible) { this.physics.resetCar(this.physics.player); this.view.cameraReady = false; this.hud.toast('CAR RESET'); }
-    if (action === 'mode') { this.physics.botEnabled = !this.physics.botEnabled; this.hud.set('mode-value', this.physics.botEnabled ? '1V1 · MAVERICK' : 'SOLO PRACTICE'); this.hud.set('match-type', this.physics.botEnabled ? 'EXHIBITION · 1V1' : 'SOLO PRACTICE'); this.hud.mode(this.physics.botEnabled); this.restart(); }
+    if (action === 'mode') { this.practice = !this.practice; this.physics.botEnabled = !this.practice; this.hud.set('mode-value', this.practice ? 'SOLO PRACTICE' : '1V1 · MAVERICK'); this.hud.set('match-type', this.practice ? 'SOLO PRACTICE' : 'EXHIBITION · 1V1'); this.hud.mode(!this.practice); this.restart(); }
     if (action === 'quality') { this.view.toggleQuality(); this.hud.set('quality-value', this.view.quality ? 'HIGH' : 'PERFORMANCE'); }
     if (action === 'help') { this.help = !this.help; this.hud.el('help-panel').hidden = !this.help; this.controls.clear(); }
     if (action === 'close-help') { this.help = false; this.hud.el('help-panel').hidden = true; this.controls.clear(); }
@@ -99,8 +99,8 @@ export class Game {
   restart() {
     this.view.effects.explosion.reset();
     this.view.effects.demolitions.reset(); this.goalBlastPending = false;
-    this.blue = this.orange = 0; this.remaining = MATCH_LENGTH; this.overtime = false; this.phase = 'ready'; this.paused = false;
-    this.physics.reset(); this.view.ballCam = true; this.hud.camera(true); this.view.cameraReady = false; this.hud.pause(false); this.hud.message('MAKE YOUR PLAY.', 'THE STAGE IS YOURS', '', 'ready'); this.hud.bindings(this.controls);
+    this.blue = this.orange = 0; this.remaining = this.practice ? 0 : MATCH_LENGTH; this.overtime = false; this.phase = this.practice ? 'playing' : 'ready'; this.paused = false;
+    this.physics.reset(); this.view.ballCam = true; this.hud.camera(true); this.view.cameraReady = false; this.hud.pause(false); this.hud.message(this.practice ? '' : 'MAKE YOUR PLAY.', 'THE STAGE IS YOURS', '', 'ready'); this.hud.bindings(this.controls);
   }
   botInput(): Input {
     const car = this.physics.bot, pos = new Vector3().copy(car.body.translation()), ball = new Vector3().copy(this.physics.ball.translation());
@@ -128,10 +128,10 @@ export class Game {
     } else if (this.phase === 'playing') {
       if (this.phaseTime > 0) { this.phaseTime -= STEP; if (this.phaseTime <= 0) this.hud.message(''); }
       this.physics.step(input, this.botInput());
-      if (this.physics.botEnabled) this.remaining += this.overtime ? STEP : -STEP;
+      if (!this.practice && this.physics.botEnabled) this.remaining += this.overtime ? STEP : -STEP;
       const goal = this.physics.goal();
       if (goal) this.score(goal);
-      else if (this.remaining <= 0 && !this.overtime && this.physics.ball.translation().y <= FIELD.ballRadius + .12) {
+      else if (!this.practice && this.remaining <= 0 && !this.overtime && this.physics.ball.translation().y <= FIELD.ballRadius + .12) {
         if (this.blue === this.orange) { this.overtime = true; this.remaining = 0; this.physics.reset(); this.kickoff(); this.hud.toast('OVERTIME · NEXT GOAL WINS'); }
         else this.end();
       }
@@ -144,7 +144,7 @@ export class Game {
       // The clock and score are settled, but cars, air control and boost stay live.
       this.physics.step(input, emptyInput());
       if (this.phaseTime <= 0) {
-        if (this.overtime || (this.remaining <= 0 && this.blue !== this.orange)) this.end();
+        if (!this.practice && (this.overtime || (this.remaining <= 0 && this.blue !== this.orange))) this.end();
         else { this.physics.reset(); this.view.cameraReady = false; this.kickoff(); }
       }
     }
@@ -177,7 +177,7 @@ export class Game {
     this.view.update(frozen ? 0 : dt, this.phase, this.celebration, frozen ? 1 : this.accumulator / STEP);
     this.view.draw();
     const car = this.physics.player;
-    this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, boosting: car.boosting && !frozen, speed: car.speed, supersonic: car.supersonic, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime }, frozen ? 0 : dt);
+    this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, boosting: car.boosting && !frozen, speed: car.speed, supersonic: car.supersonic, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime, practice: this.practice }, frozen ? 0 : dt);
     this.positionLabels();
   }
   positionLabels() {
@@ -190,7 +190,7 @@ export class Game {
   }
   snapshot() {
     const car = this.physics.player;
-    return { phase: this.phase, paused: this.paused, blue: this.blue, orange: this.orange, remaining: this.remaining, overtime: this.overtime, boost: car.boost, unlimited: this.physics.unlimited, grounded: car.grounded, jumps: car.jumpCount, wheels: car.wheels, car: { ...car.body.translation() }, rotation: { ...car.body.rotation() }, velocity: { ...car.body.linvel() }, ball: { ...this.physics.ball.translation() }, ballVelocity: { ...this.physics.ball.linvel() }, hits: this.hits, pads: this.padCount, goals: this.goalCount, camera: this.view.camera.position.toArray(), fps: this.fps, drawCalls: this.view.renderer.info.render.calls };
+    return { phase: this.phase, practice: this.practice, paused: this.paused, blue: this.blue, orange: this.orange, remaining: this.remaining, overtime: this.overtime, boost: car.boost, unlimited: this.physics.unlimited, grounded: car.grounded, jumps: car.jumpCount, wheels: car.wheels, car: { ...car.body.translation() }, rotation: { ...car.body.rotation() }, velocity: { ...car.body.linvel() }, ball: { ...this.physics.ball.translation() }, ballVelocity: { ...this.physics.ball.linvel() }, hits: this.hits, pads: this.padCount, goals: this.goalCount, camera: this.view.camera.position.toArray(), fps: this.fps, drawCalls: this.view.renderer.info.render.calls };
   }
   advance(seconds: number, input: Partial<Input> = {}) {
     for (let i = 0; i < seconds / STEP; i++) this.tick({ ...emptyInput(), ...input, jump: i === 0 && !!input.jump });
@@ -198,7 +198,7 @@ export class Game {
   }
   scenario(name: string) {
     this.view.effects.demolitions.reset(); this.goalBlastPending = false;
-    this.view.effects.explosion.reset(); this.testing = true; this.paused = false; this.physics.botEnabled = false; this.phase = 'playing'; this.phaseTime = 0; this.remaining = 300; this.overtime = false; this.physics.reset(); this.hud.message('');
+    this.view.effects.explosion.reset(); this.practice = false; this.hud.mode(true); this.testing = true; this.paused = false; this.physics.botEnabled = false; this.phase = 'playing'; this.phaseTime = 0; this.remaining = 300; this.overtime = false; this.physics.reset(); this.hud.message('');
     if (name === 'goal-blue') { this.physics.ball.setTranslation({ x: 0, y: 2.1, z: -44 }, true); this.physics.ball.setLinvel({ x: 0, y: 0, z: -22 }, true); }
     if (name === 'goal-orange') { this.physics.ball.setTranslation({ x: 0, y: 2.1, z: 44 }, true); this.physics.ball.setLinvel({ x: 0, y: 0, z: 22 }, true); }
     if (name === 'pad') { this.physics.resetCar(this.physics.player, -19, 20); this.physics.player.boost = 15; }

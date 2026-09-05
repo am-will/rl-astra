@@ -1,4 +1,5 @@
 import * as T from 'three';
+import type { CarModel } from './assets';
 
 const SAMPLES = 32, SAMPLE_STEP = 1 / 120;
 interface TrailSample { position: T.Vector3; right: T.Vector3; up: T.Vector3; time: number; power: number; }
@@ -23,6 +24,9 @@ export class SpeedTrails {
   private current = sample();
   private point = new T.Vector3();
   private side = new T.Vector3();
+  private wheelX = [-.455, .455];
+  private wheelWidth = [.075, .075];
+  private origin = new T.Vector3(0, -.305, .44);
   private positions = new T.BufferAttribute(new Float32Array((SAMPLES + 1) * 4 * 2 * 3), 3).setUsage(T.DynamicDrawUsage);
   private uvs = new T.BufferAttribute(new Float32Array((SAMPLES + 1) * 4 * 2 * 2), 2);
   private birth = new T.BufferAttribute(new Float32Array((SAMPLES + 1) * 4 * 2), 1).setUsage(T.DynamicDrawUsage);
@@ -48,7 +52,7 @@ export class SpeedTrails {
         void main(){float edge=abs(vUv.x*2.-1.);float core=exp(-edge*edge*32.);
           float filament=exp(-pow(edge-.62-.025*sin(vAge*36.-time*15.),2.)*650.);
           filament*=.55+.45*smoothstep(-.2,.65,sin(vAge*65.-time*18.));
-          float glow=pow(max(0.,1.-edge),1.65);float fade=pow(1.-vAge,1.3);
+          float glow=pow(max(0.,1.-edge),1.65);float fade=pow(1.-vAge,1.3)*smoothstep(0.,.055,vAge);
           float flow=.9+.1*sin(vAge*45.-time*24.);
           vec3 tint=mix(vec3(.7,.82,.95),mix(hot,tail,smoothstep(.15,1.,vAge)),sonic);
           vec3 color=tint*(1.8+filament*.5)+vec3(.65,.85,1.)*core*.55;
@@ -56,6 +60,29 @@ export class SpeedTrails {
           gl_FragColor=vec4(color,alpha);}`,
     });
     this.mesh = new T.Mesh(geometry, material); this.mesh.name = 'wheel-speed-trails'; this.mesh.frustumCulled = false; this.mesh.visible = false; scene.add(this.mesh);
+  }
+
+  /** Capture unanimated tire geometry once for each loaded car model. */
+  configureWheels(model: CarModel) {
+    model.root.updateMatrixWorld(true);
+    const inverse = model.root.matrixWorld.clone().invert();
+    const bounds = model.wheels.map(wheel => {
+      const box = new T.Box3();
+      wheel.traverse(object => {
+        if (!(object instanceof T.Mesh)) return;
+        object.geometry.computeBoundingBox();
+        box.union(object.geometry.boundingBox!.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inverse, object.matrixWorld)));
+      });
+      box.min.multiply(model.root.scale); box.max.multiply(model.root.scale);
+      return box;
+    }).sort((a, b) => b.getCenter(new T.Vector3()).z - a.getCenter(new T.Vector3()).z).slice(0, 2)
+      .sort((a, b) => a.min.x - b.min.x);
+    if (bounds.length !== 2 || bounds.some(b => b.isEmpty())) return;
+    const centers = bounds.map(b => b.getCenter(new T.Vector3()));
+    this.wheelX = centers.map(c => c.x);
+    this.wheelWidth = bounds.map(b => (b.max.x - b.min.x) * .36);
+    this.origin.set(0, (bounds[0].min.y + bounds[1].min.y) / 2 + .025, (centers[0].z + centers[1].z) / 2 - .03);
+    this.reset();
   }
 
   reset() {
@@ -66,7 +93,7 @@ export class SpeedTrails {
   private pose(target: TrailSample, position: T.Vector3, rotation: T.Quaternion, time: number) {
     target.position.copy(position); target.right.set(1, 0, 0).applyQuaternion(rotation); target.up.set(0, 1, 0).applyQuaternion(rotation);
     // Wheel origins are just above each rear tire's contact patch.
-    this.point.set(0, -.24, .56).applyQuaternion(rotation); target.position.add(this.point);
+    this.point.copy(this.origin).applyQuaternion(rotation); target.position.add(this.point);
     target.time = time; target.power = this.strength;
   }
 
@@ -97,8 +124,9 @@ export class SpeedTrails {
     for (let strip = 0; strip < 4; strip++) for (let i = 0; i <= SAMPLES; i++) {
       const s = i === 0 ? this.current : this.history[(this.head - Math.min(i, this.count) + 1 + SAMPLES) % SAMPLES];
       const age = T.MathUtils.clamp((this.time - s.time) / .23, 0, 1);
-      const width = (strip % 2 ? .055 : .18) * (1 - age * .8) * (.65 + this.sonic * .35);
-      this.point.copy(s.position).addScaledVector(s.right, strip < 2 ? -.43 : .43);
+      const wheel = strip < 2 ? 0 : 1;
+      const width = (strip % 2 ? .02 : this.wheelWidth[wheel]) * (1 - age * .8) * (.65 + this.sonic * .35);
+      this.point.copy(s.position).addScaledVector(s.right, this.wheelX[wheel]);
       const across = strip % 2 ? s.up : s.right, v = (strip * (SAMPLES + 1) + i) * 2;
       for (let edge = 0; edge < 2; edge++) {
         this.side.copy(this.point).addScaledVector(across, width * (edge ? 1 : -1));

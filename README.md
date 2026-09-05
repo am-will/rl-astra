@@ -44,7 +44,8 @@ Browser tests use Chrome at its standard macOS path. Set `CHROME_PATH` to a diff
 | C | Toggle ball camera |
 | R | Recover car to kickoff position |
 | 5 / Numpad 5 | Restart match |
-| Esc / P | Pause |
+| Esc | Pause |
+| **P** | **Toggle solo practice / match** |
 | H | Full controls |
 | M | Mute / unmute |
 | F | Fullscreen |
@@ -68,7 +69,7 @@ Land all four wheel traces on the ball to regain the flip. Opposing pitch cancel
 
 Performance rendering is the default, with the same models, shadows, textures and explosion animations and no bloom. The visual-quality selection is saved across reloads. High enables bloom and additional pixel density; Performance avoids the intermittent dark flashing reported with High in Chrome.
 
-The pause menu includes solo practice, a five-minute match against Maverick, restart, unlimited boost, audio, and performance rendering. Tied matches enter sudden-death overtime. The clock stays at zero while a live ball is airborne.
+Press **P** to toggle untimed solo practice, which starts immediately and skips kickoff countdowns. The pause menu includes solo practice, a five-minute match against Maverick, restart, unlimited boost, audio, and performance rendering. Tied matches enter sudden-death overtime. The clock stays at zero while a live ball is airborne.
 
 ## Implementation
 
@@ -87,17 +88,17 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 - `src/demolition.ts`: Reusable fireballs, expanding shock rings, spark streaks, tumbling tires/body fragments, BOOM lettering, and thin smoke that clears quickly and fades near the camera.
 - `src/goal-explosion.ts`, `src/blast-pass.ts`: Stellar Collapse goal celebration: plasma corona, singularity and accretion disk, 15,000 GPU particles, branching lightning, curved energy jets, ground shockwave, screen refraction, dynamic lighting, and bass/rumble audio. Geometry is reused between goals.
 - `src/ball-marker.ts`: High-contrast, height-scaled ground reticle, projected onto the floor and ramps.
-- `src/boost-gauge.ts`, `src/match-hud.css`: Segmented amber boost dial with smooth fuel sweep, trailing drain glow, animated pickup surges, boost flow, low-fuel and supersonic states; compact score tiles with goal animations and overtime styling. Reduced-motion preferences suppress decorative animations.
+- `src/boost-gauge.ts`, `src/match-hud.css`: Amber-to-coral segmented boost dial with thin, wide numerals with smooth fuel sweep, trailing drain glow, animated pickup surges, boost flow, low-fuel and supersonic states; compact score tiles with goal animations and overtime styling. Reduced-motion preferences suppress decorative animations.
 - `src/controls.ts`, `src/bindings.ts`: Keyboard and polled Gamepad API inputs, analog deadzones, edge-triggered actions, safe hotplug handling, validated persistent bindings.
 - `src/controls-menu.ts`, `src/hud.ts`, `src/style.css`: Rebinding/capture UI, controller status and live monitor, tuning, responsive match UI and active-device hints.
 
 Countdown, kickoff, goals, overtime and event popups use chunky gradient lettering with black outlines and offset black shadows, matching the demolition art. Announcements animate with a short pop; reduced-motion preferences suppress that entrance.
 
-Goal side walls are flat, parallel planes running straight back at constant width. Only the rear curves in the depth/height plane, using 2.56-unit floor and roof returns extruded across the goal width. The visible net and collision shell share this geometry. Curved rear surfaces retain fine transparent honeycomb, with silver U-shaped borders in the flat left and right side planes. Three faint shields mark the blue own goal from the field side only. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
+Goal side walls are flat, parallel planes running straight back at constant width. Only the rear curves in the depth/height plane, using an asymmetric profile with a roughly 16-degree upper arm and 2.5-degree lower sill, joined by a smooth rear curve and extruded across the goal width. The visible net and collision shell share this geometry. Curved rear surfaces retain fine transparent honeycomb, with silver U-shaped borders in the flat left and right side planes. Three faint shields mark the blue own goal from the field side only. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
 
 Goal celebrations keep the cars and all driving/aerial inputs active. The blast launches nearby cars more strongly and fades with distance; the match clock and scored ball stay stopped until the next kickoff. Demolished cars are temporarily disabled in place so the camera remains above the field before respawn.
 
-New and restarted matches default to ball cam. Straight-line acceleration from rest to supersonic measures 1.59 seconds with boost, using RocketSim's throttle curve and boost acceleration. Boost alone supplies full throttle. Holding the accelerator preserves speed after releasing boost, while coasting and braking still slow the car. Supersonic begins at 2200 reference units per second, with a one-second grace band down to 2100; the wheel trails, status label, and demolition eligibility share that state. Maximum speed remains 2300.
+New and restarted matches default to ball cam. Straight-line acceleration from rest to supersonic measures 1.59 seconds with boost, using RocketSim's throttle curve and boost acceleration. Boost alone supplies full throttle. Holding the accelerator preserves speed after releasing boost, while coasting and braking still slow the car. Supersonic begins at 2200 reference units per second, with a one-second grace band down to 2100; the wheel trails, status label, and demolition eligibility share that state. Maximum speed remains 2300. Rear-wheel trails use the loaded tire geometry for their positions and widths, starting beneath the tread with a soft leading fade.
 
 Fast, square, grounded ball contacts preserve more forward car momentum, tapering in between 1500 and 2200 reference units per second. This is a deliberate feel adjustment, applied after the ball response. In the full-speed test the car exits the hit at about 2218 rather than 1961, allowing a follow-up demolition; the ball's launch velocity remains near its previous value. Gentle and glancing contacts receive no added momentum retention.
 

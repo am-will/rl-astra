@@ -202,10 +202,7 @@ export class Stadium {
       const ribbon = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points), 40, .22, 6, false), silver); monument.add(ribbon);
     }
     const spot = new T.SpotLight(0xc2dfff, 2200, 70, .5, .65, 2); spot.position.set(47, 2, -23); spot.target.position.set(57, 22, -33); this.scene.add(spot, spot.target);
-    const shaftMat = new T.MeshBasicMaterial({ color: 0xa0d5ff, transparent: true, opacity: .035, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
-    for (const x of [-1, 1]) for (const z of [-1, 1]) {
-      const beam = new T.Mesh(new T.ConeGeometry(4, 42, 24, 1, true), shaftMat); beam.position.set(x * 40, 22, z * 35); beam.rotation.z = x * -.18; beam.rotation.x = z * .18; this.scene.add(beam);
-    }
+
   }
   update(pads: Pad[], time: number) {
     pads.forEach((p, i) => this.padAnimations[i](p.cooldown, time));

@@ -19,7 +19,8 @@ export const ACTIONS = [
   { id: 'rollRight', label: 'Air roll right', category: 'aerial', keys: ['KeyE'], pad: [button(5)] },
   { id: 'airRoll', label: 'Air roll modifier', category: 'aerial', keys: [], pad: [button(2)] },
   { id: 'camera', label: 'Toggle ball camera', category: 'match', keys: ['KeyC'], pad: [button(3)] },
-  { id: 'pause', label: 'Pause / options', category: 'match', keys: ['Escape', 'KeyP'], pad: [button(9)] },
+  { id: 'pause', label: 'Pause / options', category: 'match', keys: ['Escape'], pad: [button(9)] },
+  { id: 'mode', label: 'Toggle practice mode', category: 'match', keys: ['KeyP'], pad: [] },
   { id: 'reset', label: 'Reset car', category: 'match', keys: ['KeyR'], pad: [button(12)] },
   { id: 'restart', label: 'Restart match', category: 'match', keys: ['Digit5', 'Numpad5'], pad: [] },
   { id: 'unlimited', label: 'Unlimited boost', category: 'match', keys: ['KeyB'], pad: [button(13)] },
@@ -61,6 +62,8 @@ export function loadSettings(): ControlSettings {
       if (Array.isArray(raw.keyboard?.[action.id]) && raw.keyboard[action.id].every(validKey)) result.keyboard[action.id] = raw.keyboard[action.id].slice(0, 4);
       if (Array.isArray(raw.gamepad?.[action.id]) && raw.gamepad[action.id].every(validPad)) result.gamepad[action.id] = raw.gamepad[action.id].slice(0, 4);
     }
+    // Migrate the old P-to-pause default when adding the practice toggle.
+    if (!raw.keyboard?.mode) result.keyboard.pause = result.keyboard.pause.filter(key => key !== 'KeyP');
     for (const [key, min, max] of [['deadzone', .03, .4], ['dodgeDeadzone', .1, .95], ['steeringSensitivity', .5, 2], ['aerialSensitivity', .5, 2]] as const) {
       if (Number.isFinite(raw[key])) result[key] = Math.max(min, Math.min(max, raw[key]));
     }
