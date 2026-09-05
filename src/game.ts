@@ -177,7 +177,7 @@ export class Game {
     this.view.update(frozen ? 0 : dt, this.phase, this.celebration, frozen ? 1 : this.accumulator / STEP);
     this.view.draw();
     const car = this.physics.player;
-    this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, speed: car.speed, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime });
+    this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, speed: car.speed, supersonic: car.supersonic, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime });
     this.positionLabels();
   }
   positionLabels() {

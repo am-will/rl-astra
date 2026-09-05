@@ -16,6 +16,7 @@ npm run build     # Type-check and build production files
 npm run preview   # Serve the production build
 npm test          # Gameplay, arena, aerial control, keyboard/controller, and settings checks
 npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
+npm run test:speed    # Supersonic timing, momentum after ball hits, and wheel trails
 npm run test:feel  # Impact calibration, goal clearance/ramp driving, camera framing and refresh rates
 npm run test:impact # Goal blast control, demolitions, subtle ball trail, clear goal net, saved quality
 npm run test:impact-visuals # Goal interior and demolition drive-through screenshots
@@ -76,8 +77,9 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 - `src/follow-camera.ts`: Smooth angular orbit, spring distance, gradual mode transitions, two-subject ball framing, high-ball field of view, and collision avoidance against opaque ramps. Transparent arena walls do not pin the camera to the car.
 - `src/stadium.ts`: Procedural grass, seating, crowds, goal nets, wall mesh, trusses, banners, boost pads, and the monument.
 - `src/models.ts`: Detailed Octane and ball assets, material setup, and independent wheel pivots.
-- `src/boost-pad.ts`: Low three-lobed silver housings, recessed sockets, and amber inserts for full boost pickups. The housing remains visible during cooldown.
+- `src/boost-pad.ts`: Low three-lobed silver housings, recessed sockets, and amber inserts. Collected large orbs contract into their sockets over 180 ms; small emitters dim and retract over 120 ms. The housing remains visible during cooldown.
 - `src/rocket-boost.ts`: Animated twin orange afterburners with bright cores, rippling edges, lateral drift, and smooth release; no continuous boost smoke cloud.
+- `src/speed-trails.ts`: Short ribbons following the rear wheels through turns and aerials. Faint silver streaks become cyan/cobalt (blue team) or amber/red (orange team) at supersonic speed. Fixed-rate sampling keeps the trail consistent across refresh rates, with no smoke or particle cloud.
 - `src/effects.ts`: Boost fire, sparse short-lived ball speed sparks, skid marks, and synthesized audio.
 - `src/demolition.ts`: Reusable fireballs, expanding shock rings, spark streaks, tumbling tires/body fragments, BOOM lettering, and thin smoke that clears quickly and fades near the camera.
 - `src/goal-explosion.ts`, `src/blast-pass.ts`: Stellar Collapse goal celebration: plasma corona, singularity and accretion disk, 15,000 GPU particles, branching lightning, curved energy jets, ground shockwave, screen refraction, dynamic lighting, and bass/rumble audio. Geometry is reused between goals.
@@ -90,6 +92,10 @@ Countdown, kickoff, goals, overtime and event popups use chunky gradient letteri
 Goal interiors use 2.56-unit floor fillets, tapering flush at the mouth, with wider rounded back corners. All curved goal surfaces share transparent honeycomb; their collision shapes remain fully driveable. The camera can pass through the transparent goal shell. End-stand seats and crowd share an exclusion around both goal shells. Gentle car touches add about 10% less velocity, tapering back to full strength with speed; straight grounded hits have a further 4% reduction in upward velocity gain.
 
 Goal celebrations keep the cars and all driving/aerial inputs active. The blast launches nearby cars more strongly and fades with distance; the match clock and scored ball stay stopped until the next kickoff. Demolished cars are temporarily disabled in place so the camera remains above the field before respawn.
+
+New and restarted matches default to ball cam. Straight-line acceleration from rest to supersonic measures 1.59 seconds with boost, using RocketSim's throttle curve and boost acceleration. Boost alone supplies full throttle. Holding the accelerator preserves speed after releasing boost, while coasting and braking still slow the car. Supersonic begins at 2200 reference units per second, with a one-second grace band down to 2100; the wheel trails, status label, and demolition eligibility share that state. Maximum speed remains 2300.
+
+Fast, square, grounded ball contacts preserve more forward car momentum, tapering in between 1500 and 2200 reference units per second. This is a deliberate feel adjustment, applied after the ball response. In the full-speed test the car exits the hit at about 2218 rather than 1961, allowing a follow-up demolition; the ball's launch velocity remains near its previous value. Gentle and glancing contacts receive no added momentum retention.
 
 The car and ball use credited detailed models. Champions Field is a procedural reconstruction inspired by the original stadium, not the original map asset. The field uses the documented 81.92 × 102.4 × 20.48 dimensions, with a 2.56-unit floor fillet and smoothly joined corner planes. Handling constants for speed, gravity, jump, boost acceleration, air torque/damping, and fuel consumption are derived from RocketSim's reference values, scaled into this world. Air roll caps at 5.5 rad/s (roughly 1.14 seconds per sustained turn). A normal directional dodge completes one bounded rotation with a 0.3-second pitch recovery lock; opposite pitch still cancels it. Suspension only pushes away from a surface. Wheel adhesion follows RocketSim’s baseline 0.5 g plus an orientation-dependent wall force; on a flat ceiling it cannot cancel gravity, so wheel contact releases naturally and greater speed carries the car farther. Jumping while the chassis rests upside down starts a 0.4-second recovery roll with a 2-unit/s hop, inspired by RocketSim’s auto-flip constants. Rapier suspension and collision response are independently implemented; this is not a frame-exact reimplementation of Rocket League or a network multiplayer client.
 

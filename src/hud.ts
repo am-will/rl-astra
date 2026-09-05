@@ -74,7 +74,7 @@ export class HUD {
     ], { duration: 330, easing: 'cubic-bezier(.16,1,.3,1)' });
   }
   toast(text: string) { this.set('event-toast', text); this.el('event-toast').classList.add('visible'); this.messageUntil = performance.now() + 2200; }
-  update(data: { blue: number; orange: number; time: number; boost: number; speed: number; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; }) {
+  update(data: { blue: number; orange: number; time: number; boost: number; speed: number; supersonic: boolean; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; }) {
     this.set('blue-score', data.blue); this.set('orange-score', data.orange);
     const t = Math.ceil(Math.abs(data.time)); this.set('timer', `${data.overtime ? '+' : ''}${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`);
     this.el('overtime').style.display = data.overtime ? 'block' : 'none';
@@ -82,7 +82,7 @@ export class HUD {
     this.el('boost-arc').style.strokeDashoffset = String(465 * (1 - (data.unlimited ? 1 : data.boost / 100)));
     this.el('boost-arc').classList.toggle('low', data.boost < 20 && !data.unlimited);
     this.set('speed', Math.round(data.speed * 3.6)); this.set('drive-state', data.grounded ? 'GROUNDED' : 'AIRBORNE');
-    this.set('player-status', data.speed > 22 ? 'SUPERSONIC' : data.grounded ? 'OCTANE · BLUE TEAM' : 'OCTANE · AIRBORNE');
+    this.set('player-status', data.supersonic ? 'SUPERSONIC' : data.grounded ? 'OCTANE · BLUE TEAM' : 'OCTANE · AIRBORNE');
     this.set('fps', `${Math.round(data.fps)} FPS`);
     this.el('infinite-label').classList.toggle('active', data.unlimited);
     if (performance.now() > this.messageUntil) this.el('event-toast').classList.remove('visible');

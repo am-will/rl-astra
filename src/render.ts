@@ -7,13 +7,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createBall, createCarModel, type CarModel } from './assets';
 import { Effects, GameAudio } from './effects';
 import { Stadium, glowTexture } from './stadium';
-import { FIELD, CAR } from './config';
+import { FIELD } from './config';
 import type { Physics, Car } from './physics';
 import { loadDetailedModels, detailedCar, detailedBall } from './models';
 import { createBallMarker } from './ball-marker';
 import { createBlastPass } from './blast-pass';
 import { FollowCamera } from './follow-camera';
 import { RocketBoost } from './rocket-boost';
+import { SpeedTrails } from './speed-trails';
 
 export class GameRenderer {
   scene = new T.Scene();
@@ -28,6 +29,7 @@ export class GameRenderer {
   ballGround: T.Mesh;
   effects: Effects;
   boosts: [RocketBoost, RocketBoost];
+  speedTrails: [SpeedTrails, SpeedTrails];
   audio = new GameAudio();
   ballCam = true;
   shake = 0;
@@ -65,6 +67,7 @@ export class GameRenderer {
     }
     this.effects = new Effects(this.scene);
     this.boosts = [new RocketBoost(this.scene), new RocketBoost(this.scene)];
+    this.speedTrails = [new SpeedTrails(this.scene), new SpeedTrails(this.scene, true)];
     this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
     this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
@@ -97,11 +100,11 @@ export class GameRenderer {
     for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
     const active = car.boosting && car.demolished <= 0 && (car !== this.physics.bot || this.physics.botEnabled);
     this.boosts[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, new T.Vector3().copy(car.body.linvel()), active, dt);
+    this.speedTrails[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, car.speed, car.supersonic, model.root.visible && (car !== this.physics.bot || this.physics.botEnabled), dt);
     if (active && dt > 0 && Math.random() < dt * 35) {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
       this.effects.emit(new T.Vector3(Math.random() < .5 ? -.255 : .255, .025, 1.6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
     }
-    if (car.speed > CAR.supersonic && dt > 0) for (const x of [-.45, .45]) this.effects.emit(new T.Vector3(x, -.1, .5).applyQuaternion(model.root.quaternion).add(model.root.position), new T.Vector3(), 0xbde8ff, .35, .02);
     if (car.drifting && car.grounded && car.speed > 4 && dt > 0 && model.root.position.y < .65) {
       for (const x of [-.43, .43]) {
         const point = new T.Vector3(x, -.32, .46).applyQuaternion(model.root.quaternion).add(model.root.position);

@@ -9,7 +9,7 @@ export interface Pad { x: number; z: number; big: boolean; cooldown: number; }
 export interface Car {
   body: RAPIER.RigidBody; collider: RAPIER.Collider; boost: number; grounded: boolean; wheels: number;
   jumpCount: number; airTime: number; jumpTime: number; flipTime: number; flipAxis: Vector3; flipRotation: Quaternion; pitchLock: number;
-  boosting: boolean; speed: number; touchCooldown: number; resetCooldown: number; demolished: number;
+  boosting: boolean; speed: number; supersonic: boolean; supersonicGrace: number; touchCooldown: number; resetCooldown: number; demolished: number;
   steer: number; drifting: boolean;
   previousPosition: Vector3; previousRotation: Quaternion;
   recoveryTime: number; recoveryStart: Quaternion; recoveryTarget: Quaternion;
@@ -24,6 +24,7 @@ export class Physics {
   bot!: Car;
   pads: Pad[] = [];
   private cameraSolids = new Set<number>();
+  private incomingCarVelocities = [new Vector3(), new Vector3()];
   unlimited = false;
   botEnabled = true;
   onHit: (position: Vector3, speed: number, player: boolean) => void = () => {};
@@ -66,7 +67,7 @@ export class Physics {
   createCar(x: number, z: number, yaw: number): Car {
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, .38, z).setRotation(new Quaternion().setFromAxisAngle(UP, yaw)).setLinearDamping(.05).setAngularDamping(0).setCcdEnabled(true).setCanSleep(false));
     const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setFriction(.1).setRestitution(.08), body);
-    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
+    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
   }
   resetCar(car: Car, x = 0, z = car === this.player ? 29 : -29, yaw = car === this.player ? 0 : Math.PI) {
     car.body.setEnabled(car !== this.bot || this.botEnabled);
@@ -76,7 +77,7 @@ export class Physics {
     car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     car.body.resetForces(true);
     car.previousPosition.copy(car.body.translation()); car.previousRotation.copy(car.body.rotation());
-    Object.assign(car, { speed: 0, steer: 0, drifting: false, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
+    Object.assign(car, { speed: 0, supersonic: false, supersonicGrace: 0, steer: 0, drifting: false, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
   }
   reset() {
     this.resetCar(this.player); this.resetCar(this.bot);
@@ -90,6 +91,7 @@ export class Physics {
   demolish(car: Car) {
     if (car.demolished > 0) return;
     car.demolished = 2.5;
+    car.supersonic = false; car.supersonicGrace = 0;
     this.onDemo(car);
     // Keep its last world pose for the respawn camera. Parking a live body
     // below the floor pulled the camera through the arena and into geometry.
@@ -167,6 +169,15 @@ export class Physics {
       if (car === this.player) this.onFlipReset();
     }
     car.speed = velocity.length();
+    // RL's trail activates at 2200 uu/s and has a one-second grace band down
+    // to 2100 uu/s, preventing flicker when speed briefly dips in a turn.
+    car.supersonicGrace = car.speed >= CAR.supersonic ? 1 : car.speed < CAR.supersonic - 1 ? 0 : Math.max(0, car.supersonicGrace - dt);
+    car.supersonic = car.supersonicGrace > 0;
+    car.boosting = input.boost && (car.boost > 0 || (this.unlimited && car === this.player));
+    // RocketSim _UpdateWheels forces full throttle while boosting. Do not
+    // apply coasting resistance just because the accelerator is released.
+    const throttle = car.boosting ? 1 : input.throttle;
+    body.setLinearDamping(car.grounded ? 0 : .05);
     const signedSpeed = velocity.dot(forward);
     if (car.grounded) {
       car.airTime = 0; car.jumpCount = 0; car.pitchLock = 0;
@@ -180,11 +191,13 @@ export class Physics {
       body.setAngvel(normal.clone().multiplyScalar(turn), true);
       const grip = input.drift ? 1.65 : 9.5;
       velocity.addScaledVector(right, -velocity.dot(right) * Math.min(1, grip * dt));
-      if (input.throttle) {
-        const braking = signedSpeed * input.throttle < -.5;
-        velocity.addScaledVector(forward, input.throttle * (braking ? 35 : Math.max(0, 16 - Math.abs(signedSpeed) * 1.03)) * dt);
+      if (throttle) {
+        const braking = signedSpeed * throttle < -.5, speed = Math.abs(signedSpeed);
+        // Reference throttle curve: 1600 -> 160 uu/s² over 0 -> 1400 uu/s,
+        // then zero at 1410. Boost remains additive above that speed.
+        const acceleration = speed < 14 ? 16 - speed * (14.4 / 14) : Math.max(0, (CAR.driveSpeed - speed) * 16);
+        velocity.addScaledVector(forward, throttle * (braking ? 35 : acceleration) * dt);
       } else velocity.addScaledVector(forward, -Math.sign(signedSpeed) * Math.min(Math.abs(signedSpeed), 5.25 * dt));
-      if (!input.boost && Math.abs(signedSpeed) > CAR.driveSpeed) velocity.addScaledVector(forward, -Math.sign(signedSpeed) * 10 * dt);
     } else {
       car.airTime += dt;
       if (car.flipTime <= 0) {
@@ -248,7 +261,6 @@ export class Physics {
       body.setRotation(car.recoveryStart.clone().slerp(car.recoveryTarget, t * t * (3 - 2 * t)), true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true); car.grounded = false;
     }
-    car.boosting = input.boost && (car.boost > 0 || (this.unlimited && car === this.player));
     if (car.boosting) {
       velocity.addScaledVector(forward, (car.grounded ? CAR.boostGroundAcceleration : CAR.boostAirAcceleration) * dt);
       car.boost = this.unlimited && car === this.player ? 100 : Math.max(0, car.boost - CAR.boostDrain * dt);
@@ -268,6 +280,8 @@ export class Physics {
     const incomingBallVelocity = v3(this.ball.linvel());
     this.updateCar(this.player, input, dt);
     if (this.botEnabled) this.updateCar(this.bot, botInput, dt);
+    this.incomingCarVelocities[0].copy(this.player.body.linvel());
+    this.incomingCarVelocities[1].copy(this.bot.body.linvel());
     this.bot.body.setEnabled(this.botEnabled && this.bot.demolished <= 0);
     this.world.step();
     for (const car of [this.player, ...(this.botEnabled ? [this.bot] : [])]) {
@@ -289,6 +303,16 @@ export class Physics {
         if (car.grounded && delta.dot(forward) > .65 && gain.y > 0) gain.y *= .96;
         this.ball.setLinvel(incomingBallVelocity.clone().add(gain), true);
         incomingBallVelocity.copy(this.ball.linvel());
+        // Keep a fast, square hit from draining the car's entire speed margin.
+        // Restore part of the forward loss only at high speed, after computing
+        // the ball response, so gentle touches and ball power stay unchanged.
+        const incoming = this.incomingCarVelocities[car === this.player ? 0 : 1];
+        if (car.grounded && delta.dot(forward) > .65) {
+          const retained = .75 * MathUtils.smoothstep(incoming.length(), 15, CAR.supersonic);
+          const current = v3(car.body.linvel()), loss = Math.max(0, incoming.dot(forward) - current.dot(forward));
+          current.addScaledVector(forward, loss * retained);
+          car.body.setLinvel(current, true);
+        }
         car.touchCooldown = .18;
         this.onHit(v3(this.ball.translation()), speed, car === this.player);
       }
@@ -303,9 +327,8 @@ export class Physics {
     if (this.ball.isEnabled() && this.botEnabled && this.player.demolished <= 0 && this.bot.demolished <= 0) {
       let victim: Car | undefined;
       this.world.contactPair(this.player.collider, this.bot.collider, m => {
-        if (m.numContacts() && Math.max(this.player.speed, this.bot.speed) > CAR.supersonic) {
-          victim = this.player.speed > this.bot.speed ? this.bot : this.player;
-        }
+        const attacker = this.player.speed > this.bot.speed ? this.player : this.bot;
+        if (m.numContacts() && attacker.supersonic) victim = attacker === this.player ? this.bot : this.player;
       });
       if (victim) this.demolish(victim);
     }

@@ -22,6 +22,8 @@ Barlow Condensed by Jeremy Tribby, distributed through Fontsource under the SIL 
 - [RocketSim reference constants](https://github.com/ZealanL/RocketSim/blob/main/src/RLConst.h), ZealanL and contributors. Used to calibrate the independently written handling controller. Gravity, maximum speed, jump impulse and hold acceleration, and boost acceleration/consumption are expressed at approximately 100 reference units per world unit.
 - [RLBot useful game values](https://wiki.rlbot.org/v4/botmaking/useful-game-values/). Reference for standard arena width, length, ceiling, goal dimensions, corner planes, and approximate ramp radius.
 - [RocketSim air-control implementation](https://github.com/ZealanL/RocketSim/blob/main/src/Sim/Car/Car.cpp). Reference for local-axis angular torque, damping, roll cap, post-flip pitch recovery, wheel adhesion/ceiling release, and overturned-car auto-flip constants.
+- [RocketSim driving and boost implementation](https://github.com/ZealanL/RocketSim/blob/main/src/Sim/Car/Car.cpp), together with its reference constants above. Reference for boost-implied throttle, the engine torque curve, supersonic thresholds, and boost acceleration. The 1.59-second acceleration figure is measured in this recreation, not a capture of the original game.
+- [Rocket League Lightspeed trail reference](https://earlygame.com/rocket-league/best-rocket-trails). Visual inspiration for independently generated wheel ribbons; no reference image or original trail asset is bundled.
 - [Rapier JavaScript rigid-body documentation](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/).
 
 Rocket League, Octane, Champions Field, and associated names belong to their respective owners. This local fan recreation is not affiliated with Psyonix or Epic Games.
