@@ -14,6 +14,7 @@ export interface Car {
   previousPosition: Vector3; previousRotation: Quaternion;
   recoveryTime: number; recoveryStart: Quaternion; recoveryTarget: Quaternion;
   blastTime: number;
+  groundNormal: Vector3;
 }
 export class Physics {
   world!: RAPIER.World;
@@ -38,7 +39,10 @@ export class Physics {
     this.world.numSolverIterations = 8;
     this.buildArena();
     this.ball = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, FIELD.ballRadius + .08, 0).setLinearDamping(.045).setAngularDamping(.13).setCcdEnabled(true));
-    this.ballCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(30).setRestitution(.6).setFriction(.35), this.ball);
+    // Explicit pair friction keeps the ball's existing response while letting
+    // the chassis slide without the arena's friction dominating it. Max wins
+    // over the car's Min: ball/car=.225, ball/floor=.5, ball/wall=.475.
+    this.ballCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(30).setRestitution(.6).setFriction(.225).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max), this.ball);
     this.player = this.createCar(0, 29, 0);
     this.bot = this.createCar(0, -29, Math.PI);
     for (const z of [-35, -18, 0, 18, 35]) for (const x of [-19, 0, 19]) {
@@ -48,7 +52,7 @@ export class Physics {
     for (const x of [-31, 31]) for (const z of [-37, 0, 37]) this.pads.push({ x, z, big: true, cooldown: 0 });
   }
   box(x: number, y: number, z: number, sx: number, sy: number, sz: number, rotation?: Quaternion) {
-    const collider = RAPIER.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2).setTranslation(x, y, z).setFriction(.65).setRestitution(.62);
+    const collider = RAPIER.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2).setTranslation(x, y, z).setFriction(.5).setRestitution(.62);
     if (rotation) collider.setRotation(rotation);
     this.cameraSolids.add(this.world.createCollider(collider).handle);
   }
@@ -58,7 +62,7 @@ export class Physics {
     for (const { geometry, kind } of arenaSurfaces()) {
       const vertices = new Float32Array(geometry.getAttribute('position').array);
       const indices = new Uint32Array(geometry.index!.array);
-      const collider = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setFriction(.6).setRestitution(.62));
+      const collider = this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setFriction(.475).setRestitution(.62));
       if (kind === 'ramp') this.cameraSolids.add(collider.handle);
       geometry.dispose();
     }
@@ -66,8 +70,8 @@ export class Physics {
 
   createCar(x: number, z: number, yaw: number): Car {
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, .38, z).setRotation(new Quaternion().setFromAxisAngle(UP, yaw)).setLinearDamping(.05).setAngularDamping(0).setCcdEnabled(true).setCanSleep(false));
-    const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setFriction(.1).setRestitution(.08), body);
-    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
+    const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setFriction(.035).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(.08), body);
+    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
   }
   resetCar(car: Car, x = 0, z = car === this.player ? 29 : -29, yaw = car === this.player ? 0 : Math.PI) {
     car.body.setEnabled(car !== this.bot || this.botEnabled);
@@ -77,6 +81,7 @@ export class Physics {
     car.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     car.body.resetForces(true);
     car.previousPosition.copy(car.body.translation()); car.previousRotation.copy(car.body.rotation());
+    car.groundNormal.copy(UP);
     Object.assign(car, { speed: 0, supersonic: false, supersonicGrace: 0, steer: 0, drifting: false, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
   }
   reset() {
@@ -126,6 +131,7 @@ export class Physics {
     return hit ? Math.max(.12, hit.timeOfImpact - .22) : distance;
   }
   updateCar(car: Car, input: Input, dt: number) {
+    const wasGrounded = car.grounded;
     car.steer = input.steer; car.drifting = input.drift;
     car.pitchLock = Math.max(0, car.pitchLock - dt);
     if (car.demolished > 0) { car.demolished -= dt; if (car.demolished <= 0) this.resetCar(car, car === this.player ? -20 : 20); return; }
@@ -146,8 +152,9 @@ export class Physics {
         const compression = .305 - hit.timeOfImpact;
         // Suspension pushes the chassis away from the surface; it cannot pull
         // the car back onto a ceiling as an extended spring would.
-        const support = Math.max(0, 180 * CAR.gravity / 4 * Math.max(0, up.y) + compression * 10000 - velocity.dot(up) * 620);
-        if (car.jumpTime <= 0 && car.flipTime <= 0 && !input.jump) body.addForce(up.clone().multiplyScalar(support), true);
+        const contactNormal = v3(hit.normal);
+        const support = Math.max(0, 180 * CAR.gravity / 4 * Math.max(0, contactNormal.y) + compression * 10000 - velocity.dot(contactNormal) * 620);
+        if (car.jumpTime <= 0 && car.flipTime <= 0 && !input.jump) body.addForce(contactNormal.multiplyScalar(support), true);
       }
     }
     car.wheels = contacts;
@@ -177,27 +184,39 @@ export class Physics {
     // RocketSim _UpdateWheels forces full throttle while boosting. Do not
     // apply coasting resistance just because the accelerator is released.
     const throttle = car.boosting ? 1 : input.throttle;
-    body.setLinearDamping(car.grounded ? 0 : .05);
+    body.setLinearDamping(car.grounded ? 0 : .015);
     const signedSpeed = velocity.dot(forward);
     if (car.grounded) {
       car.airTime = 0; car.jumpCount = 0; car.pitchLock = 0;
       normal.normalize();
+      // Roll momentum around a continuous surface instead of repeatedly
+      // projecting it away at each ramp facet. Landing/jumping never converts
+      // impact velocity into forward speed.
+      if (wasGrounded && !input.jump && ballContacts === 0 && car.groundNormal.dot(normal) > .8) {
+        velocity.applyQuaternion(new Quaternion().setFromUnitVectors(car.groundNormal, normal));
+      }
+      car.groundNormal.copy(normal);
       const heading = forward.clone().projectOnPlane(normal).normalize();
       const sideways = new Vector3().crossVectors(heading, normal).normalize();
       const target = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(sideways, normal, heading.clone().negate()));
-      q.slerp(target, 1 - Math.exp(-13 * dt));
+      q.slerp(target, 1 - Math.exp(-28 * dt));
       body.setRotation(q, true);
       const turn = input.steer * (.85 + Math.min(Math.abs(signedSpeed) / 3.5, 1) * 1.25) * (signedSpeed < -.25 ? -1 : 1) * (input.drift ? 1.5 : 1);
       body.setAngvel(normal.clone().multiplyScalar(turn), true);
       const grip = input.drift ? 1.65 : 9.5;
-      velocity.addScaledVector(right, -velocity.dot(right) * Math.min(1, grip * dt));
+      const normalSpeed = velocity.dot(normal), tangent = velocity.clone().addScaledVector(normal, -normalSpeed), rollingSpeed = tangent.length();
+      tangent.addScaledVector(sideways, -tangent.dot(sideways) * Math.min(1, grip * dt));
+      // Tire grip mostly redirects rolling momentum. A small scrub loss
+      // remains, while powersliding retains more of an angled landing.
+      if (tangent.lengthSq() > .001) tangent.setLength(MathUtils.lerp(tangent.length(), rollingSpeed, input.drift ? .97 : .88));
+      velocity.copy(tangent).addScaledVector(normal, normalSpeed);
       if (throttle) {
         const braking = signedSpeed * throttle < -.5, speed = Math.abs(signedSpeed);
         // Reference throttle curve: 1600 -> 160 uu/s² over 0 -> 1400 uu/s,
         // then zero at 1410. Boost remains additive above that speed.
         const acceleration = speed < 14 ? 16 - speed * (14.4 / 14) : Math.max(0, (CAR.driveSpeed - speed) * 16);
         velocity.addScaledVector(forward, throttle * (braking ? 35 : acceleration) * dt);
-      } else velocity.addScaledVector(forward, -Math.sign(signedSpeed) * Math.min(Math.abs(signedSpeed), 5.25 * dt));
+      } else velocity.addScaledVector(forward, -Math.sign(signedSpeed) * Math.min(Math.abs(signedSpeed), 3.1 * dt));
     } else {
       car.airTime += dt;
       if (car.flipTime <= 0) {

@@ -68,6 +68,8 @@ try {
   await page.keyboard.press('Escape');check('Keyboard Escape opens pause',await page.locator('#pause-panel').isVisible());await page.keyboard.press('Escape');check('Keyboard Escape resumes from pause',!(await page.locator('#pause-panel').isVisible()));
   await page.keyboard.down('i');input=await read();await page.keyboard.up('i');check('Rebound keyboard acceleration works',input.throttle===1,input);
   await page.keyboard.down('w');input=await read();await page.keyboard.up('w');check('Old keyboard acceleration is removed',input.throttle===0,input);
+  // Wait for a neutral controller sample after keyboard resume before pressing R1.
+  await page.waitForFunction(()=>!window.__game.controls.padBlocked);
   await button(5);input=await read();check('Rebound R1 activates boost',input.boost,input);await page.keyboard.press('Escape');await page.keyboard.press('Escape');input=await read();check('Held controls do not leak through pause/resume',!input.boost,input);await button(5,0);
   await page.evaluate(()=>window.testPads=[]);await pause();check('Disconnect pauses safely and clears input',await page.evaluate(()=>window.__game.paused&&window.__game.controls.read().throttle===0));
   await page.reload();await page.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));

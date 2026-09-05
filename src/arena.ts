@@ -12,8 +12,14 @@ const smooth = (x: number) => { const t = T.MathUtils.clamp(x, 0, 1); return t *
 function path(points: P[], rounding: number, cornerFraction = .4): BoundaryPoint[] {
   const samples: P[] = [];
   const line = (a: P, b: P) => {
-    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .7));
-    for (let i = 0; i < n; i++) samples.push([T.MathUtils.lerp(a[0], b[0], i / n), T.MathUtils.lerp(a[1], b[1], i / n)]);
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(length / .7));
+    const stops = Array.from({ length: n }, (_, i) => i / n);
+    // Extra samples only around the compact returns at the two goalposts.
+    for (let distance = .1; distance < Math.min(1.6, length); distance += .1) {
+      if (a === points[0]) stops.push(distance / length);
+      if (b === points.at(-1)) stops.push(1 - distance / length);
+    }
+    for (const t of [...new Set(stops)].sort((x, y) => x - y)) samples.push([T.MathUtils.lerp(a[0], b[0], t), T.MathUtils.lerp(a[1], b[1], t)]);
   };
   let last = points[0];
   for (let i = 1; i < points.length - 1; i++) {
@@ -103,7 +109,9 @@ export function arenaSurfaces(): ArenaSurface[] {
   const surfaces: ArenaSurface[] = [];
   const { length: l, height: h, rampRadius: r, goalWidth: g, goalDepth: d } = FIELD;
   const add = (geometry: T.BufferGeometry, kind: SurfaceKind, team = 0) => surfaces.push({ geometry, kind, team });
-  const bottomRadius = (p: BoundaryPoint) => r * smooth((Math.abs(p.x) - g) / 5.2);
+  // Hold the full quarter-round up to the post, then tuck its last short
+  // return into the mouth instead of flattening several metres early.
+  const bottomRadius = (p: BoundaryPoint) => r * smooth((Math.abs(p.x) - g) / 1.5);
   for (const side of [-1, 1]) {
     const boundary = sideBoundary(side);
     add(sweep(boundary, 24, (p, v) => { const radius = bottomRadius(p), a = v * Math.PI / 2; return [radius * (Math.sin(a) - 1), radius * (1 - Math.cos(a))]; }), 'ramp');

@@ -16,17 +16,23 @@ export class FollowCamera {
   private distance = 5;
   private distanceVelocity = 0;
   private mode = 0;
+  private previousMode = false;
+  private switchTime = 0;
   private clearance = 20;
   private aim = new Quaternion();
   private matrix = new Matrix4();
   update(camera: PerspectiveCamera, pos: Vector3, rotation: Quaternion, ball: Vector3, speed: number, ballCam: boolean, flipping: boolean, dt: number, reset: boolean, clear: (from: Vector3, to: Vector3) => number) {
     if (!reset && dt <= 0) return;
+    if (reset) { this.previousMode = ballCam; this.switchTime = 0; }
+    else if (ballCam !== this.previousMode) { this.previousMode = ballCam; this.switchTime = .65; }
+    const response = this.switchTime > 0 ? 2 : 1;
+    this.switchTime = Math.max(0, this.switchTime - dt);
     const carForward = new Vector3(0, 0, -1).applyQuaternion(rotation); carForward.y = 0;
     if (carForward.lengthSq() < .1 || flipping) carForward.copy(this.forward); else carForward.normalize();
     const carYaw = Math.atan2(-carForward.x, -carForward.z), toBall = ball.clone().sub(pos);
     const planarDistance = Math.hypot(toBall.x, toBall.z);
     if (reset) { this.yaw = carYaw; this.mode = ballCam ? 1 : 0; this.yawVelocity = this.distanceVelocity = 0; }
-    else this.mode = MathUtils.damp(this.mode, ballCam ? 1 : 0, 8, dt);
+    else this.mode = MathUtils.damp(this.mode, ballCam ? 1 : 0, 8 * response, dt);
     // Retain the orbit heading directly underneath the ball; there is no
     // meaningful horizontal direction there. Never lerp antiparallel vectors.
     const ballYaw = planarDistance > .65 ? Math.atan2(-toBall.x, -toBall.z) : this.yaw;
@@ -50,9 +56,9 @@ export class FollowCamera {
     }
     if (reset) this.yaw = desiredYaw;
     else {
-      const [yaw, velocity] = spring(this.yaw, this.yawVelocity, this.yaw + shortest(desiredYaw - this.yaw), 11, dt);
-      this.yaw += MathUtils.clamp(yaw - this.yaw, -4 * dt, 4 * dt);
-      this.yawVelocity = MathUtils.clamp(velocity, -4, 4);
+      const [yaw, velocity] = spring(this.yaw, this.yawVelocity, this.yaw + shortest(desiredYaw - this.yaw), 11 * response, dt);
+      this.yaw += MathUtils.clamp(yaw - this.yaw, -4 * response * dt, 4 * response * dt);
+      this.yawVelocity = MathUtils.clamp(velocity, -4 * response, 4 * response);
     }
     this.forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const height = 2.05;
@@ -73,7 +79,7 @@ export class FollowCamera {
     }
     const desiredDistance = MathUtils.lerp(baseDistance, fit, this.mode);
     if (reset) this.distance = desiredDistance;
-    else [this.distance, this.distanceVelocity] = spring(this.distance, this.distanceVelocity, desiredDistance, 10, dt);
+    else [this.distance, this.distanceVelocity] = spring(this.distance, this.distanceVelocity, desiredDistance, 10 * response, dt);
     let desired = pos.clone().addScaledVector(this.forward, -this.distance).addScaledVector(UP, height);
     desired.y = MathUtils.clamp(desired.y, .7, FIELD.height - .4);
     // Sweep from the car through opaque floor and ramp collision meshes.
@@ -100,11 +106,11 @@ export class FollowCamera {
     if (reset) this.aim.copy(targetRotation);
     else {
       const angle = this.aim.angleTo(targetRotation);
-      this.aim.slerp(targetRotation, Math.min(1 - Math.exp(-15 * dt), 6 * dt / Math.max(.001, angle)));
+      this.aim.slerp(targetRotation, Math.min(1 - Math.exp(-15 * response * dt), 6 * response * dt / Math.max(.001, angle)));
     }
     camera.quaternion.copy(this.aim);
     this.look.copy(desired).add(new Vector3(0, 0, -1).applyQuaternion(this.aim).multiplyScalar(8));
-    camera.fov = reset ? baseFov : MathUtils.damp(camera.fov, baseFov, 5, dt);
+    camera.fov = reset ? baseFov : MathUtils.damp(camera.fov, baseFov, 5 * response, dt);
     camera.updateProjectionMatrix();
   }
 }

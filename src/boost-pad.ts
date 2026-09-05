@@ -12,10 +12,10 @@ function collectionProgress(duration: number) {
   };
 }
 
-/** Low, three-lobed metal housing with a recessed emitter and amber edge inserts. */
-export function createLargeBoostPad(glow: T.Texture) {
+/** Shared three-lobed metal housing and recessed emitter. */
+function createBoostPadHousing(triangular = false) {
   const root = new T.Group(), housing = new T.Group(), pickup = new T.Group(), emitters = new T.Group();
-  root.name = 'large-boost-pad'; housing.name = 'boost-pad-housing'; pickup.name = 'boost-pad-pickup';
+  housing.name = 'boost-pad-housing'; pickup.name = 'boost-pad-pickup';
   root.add(housing, pickup); pickup.add(emitters);
   const dark = new T.MeshStandardMaterial({ color: 0x17212b, metalness: .55, roughness: .52 });
   const silver = new T.MeshStandardMaterial({ color: 0xc1ccd6, metalness: .62, roughness: .36 });
@@ -24,6 +24,18 @@ export function createLargeBoostPad(glow: T.Texture) {
 
   const outline = (radius: number) => {
     const shape = new T.Shape();
+    if (triangular) {
+      const corners = Array.from({ length: 3 }, (_, i) => new T.Vector2(Math.cos(i * Math.PI * 2 / 3), Math.sin(i * Math.PI * 2 / 3)).multiplyScalar(radius + .38));
+      for (let i = 0; i < 3; i++) {
+        const corner = corners[i], next = corners[(i + 1) % 3];
+        const entry = corner.clone().lerp(corners[(i + 2) % 3], .12), exit = corner.clone().lerp(next, .12);
+        if (!i) shape.moveTo(entry.x, entry.y);
+        shape.quadraticCurveTo(corner.x, corner.y, exit.x, exit.y);
+        const nextEntry = next.clone().lerp(corner, .12), middle = exit.clone().add(nextEntry).normalize().multiplyScalar(radius * 1.04);
+        shape.quadraticCurveTo(middle.x, middle.y, nextEntry.x, nextEntry.y);
+      }
+      shape.closePath(); return shape;
+    }
     for (let i = 0; i <= 96; i++) {
       const a = i / 96 * Math.PI * 2, r = radius + .15 * Math.cos(a * 3);
       const x = Math.cos(a) * r, y = Math.sin(a) * r;
@@ -64,7 +76,7 @@ export function createLargeBoostPad(glow: T.Texture) {
     plate(sector(.94, 1.30, angle, .31), .027, .012, .06, dark);
     plate(sector(1.07, 1.26, angle, .235), .008, .009, .097, amber, emitters);
     // Inset dark panels leave a clean silver ring and three broad metal spokes.
-    plate(sector(.96, 1.15, angle + Math.PI / 3, .36), .004, .003, .061, panel);
+    plate(sector(triangular ? .9 : .96, triangular ? 1.035 : 1.15, angle + Math.PI / 3, .36), .004, .003, .061, panel);
     for (const side of [-1, 1]) {
       const a = angle + side * .41;
       const fastener = new T.Mesh(new T.CylinderGeometry(.031, .035, .012, 6), dark);
@@ -75,6 +87,12 @@ export function createLargeBoostPad(glow: T.Texture) {
   housing.traverse(o => { if (o instanceof T.Mesh) o.castShadow = false; });
   emitters.traverse(o => { if (o instanceof T.Mesh) { o.castShadow = false; o.receiveShadow = false; } });
 
+  return { root, housing, pickup, emitters, amber };
+}
+
+export function createLargeBoostPad(glow: T.Texture) {
+  const { root, pickup, amber } = createBoostPadHousing();
+  root.name = 'large-boost-pad';
   const orbMaterial = amber.clone(); orbMaterial.transparent = false; orbMaterial.depthWrite = true;
   const orb = new T.Mesh(new T.SphereGeometry(.32, 24, 16), orbMaterial); orb.position.y = .8; pickup.add(orb);
   const halo = new T.Mesh(new T.PlaneGeometry(3.2, 3.2), new T.MeshBasicMaterial({ map: glow, color: 0xffb82b, transparent: true, opacity: .18, depthWrite: false, blending: T.AdditiveBlending }));
@@ -103,19 +121,50 @@ export function createLargeBoostPad(glow: T.Texture) {
 }
 
 export function createSmallBoostPad() {
-  const root = new T.Group(); root.name = 'small-boost-pad';
-  const base = new T.Mesh(new T.CylinderGeometry(.65, .8, .07, 12), new T.MeshStandardMaterial({ color: 0x253232, metalness: .8, roughness: .4 })); root.add(base);
-  const ring = new T.Mesh(new T.TorusGeometry(.49, .055, 6, 24), new T.MeshStandardMaterial({ color: 0xc39a42, metalness: .65, roughness: .35 }));
-  ring.rotation.x = Math.PI / 2; ring.position.y = .055; root.add(ring);
-  const glow = new T.MeshStandardMaterial({ color: 0xffa132, emissive: 0xff901b, emissiveIntensity: 1.7, transparent: true, depthWrite: false });
-  const light = new T.Mesh(new T.CylinderGeometry(.32, .4, .06, 8), glow); light.name = 'boost-pad-pickup'; light.position.y = .1; root.add(light);
+  const { root, pickup, amber } = createBoostPadHousing(true);
+  root.name = 'small-boost-pad'; root.scale.setScalar(.58);
+  amber.color.setHex(0xff961c); amber.emissive.setHex(0xff7008);
+  // The small pickup is a flat silver three-spoke plate with a central amber
+  // disk and short translucent energy curtains, as in the supplied reference.
+  const energyMaterial = new T.ShaderMaterial({
+    transparent: true, depthWrite: false, side: T.DoubleSide, blending: T.AdditiveBlending,
+    uniforms: { time: { value: 0 }, fade: { value: 1 } },
+    vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader: `uniform float time,fade;varying vec2 vUv;
+      void main(){float edge=smoothstep(0.,.08,vUv.x)*smoothstep(0.,.08,1.-vUv.x);
+        float grain=.8+.12*sin(vUv.x*18.+time*2.4)+.08*sin(vUv.x*33.-vUv.y*13.+time*6.);
+        float rise=pow(1.-vUv.y,1.7);float rim=exp(-vUv.y*22.);
+        vec3 tint=mix(vec3(1.,.39,.025),vec3(1.,.84,.16),rim);
+        gl_FragColor=vec4(tint*(1.+rim),edge*(rise*.65*grain+rim*.45)*fade);}`,
+  });
+  const diskMaterial = new T.ShaderMaterial({
+    uniforms: energyMaterial.uniforms,
+    vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader: `uniform float fade;varying vec2 vUv;void main(){
+      float r=length(vUv*2.-1.);float center=exp(-r*r*4.5),ring=exp(-pow(r-.73,2.)*1900.);
+      vec3 color=vec3(.13,.07,.025)+vec3(1.,.46,.015)*center+vec3(.65,.43,.025)*ring;
+      color+=vec3(.1,.3,.055)*exp(-r*r*20.);
+      gl_FragColor=vec4(color*fade,1.);}`,
+  });
+  const disk = new T.Mesh(new T.CircleGeometry(.44, 48), diskMaterial);
+  disk.rotation.x = -Math.PI / 2; disk.position.y = .101; pickup.add(disk);
+  const curtains = new T.Group(); curtains.name = 'small-pad-energy'; pickup.add(curtains);
+  for (let i = 0; i < 3; i++) {
+    const angle = i * Math.PI * 2 / 3;
+    for (const [radius, height, span, offset] of [[.58, .55, 1.5, Math.PI / 3], [1.18, .42, .48, 0]]) {
+      const arc = new T.Mesh(new T.CylinderGeometry(radius, radius, height, 24, 1, true, angle + offset - span / 2, span), energyMaterial);
+      arc.rotation.y = Math.PI / 2; arc.position.y = .11 + height / 2; curtains.add(arc);
+    }
+  }
+  mergeStatic(curtains);
+  curtains.children.forEach(o => { if (o instanceof T.Mesh) { o.castShadow = false; o.receiveShadow = false; } });
   const progress = collectionProgress(.12);
   const update = (cooldown: number, time: number) => {
     const p = progress(cooldown, time), fade = 1 - T.MathUtils.smoothstep(p, 0, 1);
-    light.visible = p < 1;
-    light.scale.set(1 - p * .3, 1 - p * .65, 1 - p * .3);
-    light.position.y = .1 - p * .045;
-    glow.opacity = fade; glow.emissiveIntensity = 1.7 * fade;
+    pickup.visible = p < 1;
+    curtains.scale.y = Math.max(.001, 1 - p * .9);
+    energyMaterial.uniforms.time.value = time; energyMaterial.uniforms.fade.value = fade;
+    amber.opacity = fade; amber.emissiveIntensity = .85 * fade;
   };
   return { root, update };
 }
