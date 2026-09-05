@@ -1,10 +1,10 @@
 import * as T from 'three';
-import { FIELD, BLUE, ORANGE } from './config';
+import { FIELD } from './config';
 import { goalRadii, goalBoundary } from './arena';
 import { box, material, mergeStatic } from './assets';
 
 // Cross-sections follow the same floor and roof radii as the collision shell.
-// The recessed collar is flush with that shell, leaving the back net clear.
+// Metal trim belongs to the mouth edges; the recessed shell remains clear.
 const leftBoundary = goalBoundary(1).filter(p => p.x < 0);
 function sidePoint(depth: number) {
   const index = Math.max(1, leftBoundary.findIndex(p => p.z - FIELD.length >= depth));
@@ -58,7 +58,6 @@ export function createGoalFrame(team: number) {
   const root = new T.Group(); root.name = team > 0 ? 'blue-goal-frame' : 'orange-goal-frame';
   root.position.z = team * FIELD.length; root.scale.z = team;
   const body = new T.Group(); root.add(body);
-  const color = team > 0 ? BLUE : ORANGE;
   const canvas = document.createElement('canvas'); canvas.width = 768; canvas.height = 444;
   const c = canvas.getContext('2d')!; c.fillStyle = '#222d36'; c.fillRect(0, 0, 768, 444);
   for (let column = -1; column <= 9; column++) for (let row = -1; row <= 4; row++) {
@@ -78,29 +77,36 @@ export function createGoalFrame(team: number) {
   const rail = (points: T.Vector3[], radius: number, mat: T.Material) => body.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points), 192, radius, 6, false), mat));
   const front = (outset: number, z: number) => section(0, outset).map(p => p.setZ(z));
   // Broad beveled surround, with two inset light channels rather than a pipe.
-  ribbon(front(.015, -.22), front(.16, -.4), alloy);
+  ribbon(front(.015, -.22), front(.16, -.4), gunmetal);
   ribbon(front(.16, -.4), front(.65, -.4), graphite);
   ribbon(front(.65, -.4), front(.76, -.24), gunmetal);
   ribbon(front(.76, -.24), front(.76, .42), graphite);
   ribbon(front(.015, -.22), section(.65, .025), gunmetal);
   rail(front(.19, -.414), .032, pinstripe);
   rail(front(.56, -.416), .047, light);
-  // Recessed silver shoulder. Its rolling lower corners and broader upper
-  // curves reveal the goal's depth while the rest of the shell stays glass.
-  for (let i = 0; i < 24; i++) {
-    const a = T.MathUtils.lerp(1.1, 3.8, i / 24), b = T.MathUtils.lerp(1.1, 3.8, (i + 1) / 24);
-    ribbon(section(a, -.035), section(b, -.035), i < 3 || i > 20 ? graphite : alloy);
-  }
-  rail(section(1.46, -.055), .024, pinstripe);
-  rail(section(3.43, -.055), .034, light);
-  for (const depth of [1.82, 2.5, 3.16]) rail(section(depth, -.052), .008, gunmetal);
-  // Segmented sill / header lights and the inset sockets in each shoulder.
+  // Two separate C-shaped trims hug the outside left/right mouth edges.
+  // Their ends stop at the corner tangencies, never spanning the roof center.
+  const cornerBorder = (side: number, outset: number, depth: number) => {
+    const { top } = goalRadii(0), w = FIELD.goalWidth + outset;
+    const bottom = .7, points: T.Vector3[] = [];
+    for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI / 2; points.push(new T.Vector3(side * (w + bottom - bottom * Math.sin(a)), bottom * (1 - Math.cos(a)), depth)); }
+    for (let i = 1; i <= 12; i++) points.push(new T.Vector3(side * w, T.MathUtils.lerp(bottom, FIELD.goalHeight - top, i / 12), depth));
+    for (let i = 1; i <= 24; i++) { const a = i / 24 * Math.PI / 2; points.push(new T.Vector3(side * (FIELD.goalWidth - top + (top + outset) * Math.cos(a)), FIELD.goalHeight - top + (top + outset) * Math.sin(a), depth)); }
+    return points;
+  };
   for (const side of [-1, 1]) {
-    for (const depth of [1.7, 2.38, 3.06]) {
-      const p = section(depth, -.085)[44], x = side * Math.abs(p.x);
-      const socket = box(body, [.52, .085, .54], [x, p.y, p.z], graphite, [0, 0, -side * Math.PI / 4]);
-      const lamp = box(body, [.33, .035, .36], [x - side * .048, p.y - .048, p.z], light, [0, 0, -side * Math.PI / 4]);
-      socket.castShadow = lamp.castShadow = false;
+    ribbon(cornerBorder(side, .015, -.28), cornerBorder(side, .1, -.45), alloy);
+    ribbon(cornerBorder(side, .1, -.45), cornerBorder(side, .4, -.45), alloy);
+    ribbon(cornerBorder(side, .4, -.45), cornerBorder(side, .46, -.34), gunmetal);
+    ribbon(cornerBorder(side, .46, -.34), cornerBorder(side, .46, .22), graphite);
+    rail(cornerBorder(side, .095, -.466), .017, pinstripe);
+    // Small lamps are inset into the upper outside corners of the mouth.
+    const { top } = goalRadii(0);
+    for (const angle of [.28, .65, 1.02]) {
+      const x = side * (FIELD.goalWidth - top + (top + .25) * Math.cos(angle));
+      const y = FIELD.goalHeight - top + (top + .25) * Math.sin(angle);
+      box(body, [.15, .27, .032], [x, y, -.472], graphite, [0, 0, side * angle]);
+      box(body, [.07, .17, .018], [x, y, -.492], light, [0, 0, side * angle]);
     }
     for (const y of [1.5, 3.3]) {
       const points: T.Vector3[] = [];
