@@ -70,7 +70,9 @@ Land all four wheel traces on the ball to regain the flip. Opposing pitch cancel
 
 Open **Esc / Options → Camera & visuals** for saved FOV, camera height, distance, and downward-angle sliders. The field remains visible for a live paused preview. Car cam follows the selected pitch; ball cam biases its framing while keeping the ball visible. Switch camera modes from the preview button. Camera reset leaves quality and boost preferences intact.
 
-**Performance** is the default and includes the detailed Octane materials, textured field, shadows, and all gameplay effects without bloom. **High** adds bloom and extra pixel density. **Ultra** adds 500,000 instanced grass tufts, warm sunset lighting, richer reflections, 4096px shadows, and up to 2× pixel density. All tiers share the painted team crests, infield lanes, and physical car materials. Ultra costs more GPU time; choose Performance for the lightest rendering.
+With ball cam off, a small silver 3D arrow beside the car points toward the ball, including airborne balls. It clears during goals and demolitions. The scoreboard uses thin arena numerals on inward-tilted team panels, with a flat central clock.
+
+**Performance** is the default and includes the detailed Octane materials, textured field, shadows, and all gameplay effects without bloom. **High** adds bloom and extra pixel density. **Ultra** adds 500,000 instanced grass tufts, warm sunset lighting, richer reflections, 4096px shadows, and up to 2× pixel density. All tiers share the painted team crests, infield lanes, blue/orange ceramic ramp patterns with inlaid borders, and physical car materials. Ultra costs more GPU time; choose Performance for the lightest rendering.
 
 The saved **Boost style** selector offers **Classic**, the original focused orange afterburner, and **Inferno**, a multicolored smoke plume with no separate nozzle flame. Inferno particles remain in world space through turns, expire after release, and clear on teleports or style changes. Both styles work in every quality tier.
 

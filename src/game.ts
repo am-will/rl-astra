@@ -193,9 +193,6 @@ export class Game {
     const label = this.hud.el('bot-name'), projected = this.view.bot.root.position.clone().add(new Vector3(0, 2, 0)).project(this.view.camera);
     label.style.display = this.physics.botEnabled && this.physics.bot.demolished <= 0 && Math.abs(projected.x) < .95 && Math.abs(projected.y) < .85 && projected.z < 1 ? 'block' : 'none';
     label.style.left = `${(projected.x * .5 + .5) * innerWidth}px`; label.style.top = `${(-projected.y * .5 + .5) * innerHeight}px`;
-    const ball = this.view.ball.position.clone().project(this.view.camera), arrow = this.hud.el('ball-arrow');
-    arrow.style.display = (Math.abs(ball.x) > .96 || Math.abs(ball.y) > .9 || ball.z > 1) && this.phase === 'playing' ? 'block' : 'none';
-    arrow.style.left = ball.x < 0 ? '24px' : 'auto'; arrow.style.right = ball.x < 0 ? 'auto' : '24px';
   }
   snapshot() {
     const car = this.physics.player;

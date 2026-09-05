@@ -7,6 +7,7 @@ import { arenaSurfaces, sideBoundary, honeycombMaterial } from './arena';
 import { createLargeBoostPad, createSmallBoostPad } from './boost-pad';
 import { createGoalFrame } from './goal-frame';
 import { UltraGrass } from './ultra-grass';
+import { rampMaterial, decorateRamp } from './ramp-decoration';
 
 function turfTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 1536; canvas.height = 2048;
@@ -130,12 +131,13 @@ export class Stadium {
     const { goalWidth: g, width: w, length: l, goalDepth: d } = FIELD;
     // The camera already sweeps against the floor and ramps. Keep these driving
     // surfaces solid even when the lens is low or looking down a wall.
-    const rampMat = new T.MeshStandardMaterial({ color: 0x293e49, metalness: .4, roughness: .65, side: T.DoubleSide });
+    const rampMat = rampMaterial();
     const netMats = [honeycombMaterial(.065, 1), honeycombMaterial(.065, -1)];
     for (const surface of arenaSurfaces()) {
       const goalIndex = surface.team > 0 ? 0 : 1;
       const mat = surface.kind === 'ramp' ? rampMat : surface.kind.startsWith('goal-') ? netMats[goalIndex] : glass;
       const mesh = new T.Mesh(surface.geometry, mat); mesh.name = `arena-${surface.kind}`; mesh.receiveShadow = surface.kind === 'ramp'; scene.add(mesh);
+      if (surface.kind === 'ramp') decorateRamp(scene, surface.geometry);
     }
     // Continuous light rails follow the actual boundary, including corner curves.
     for (const side of [-1, 1]) for (const level of [2.65, 8.7, FIELD.height - FIELD.rampRadius]) {

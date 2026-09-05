@@ -1,6 +1,7 @@
 import type { Controls } from './controls';
 import type { ActionId } from './bindings';
 import { BoostGauge } from './boost-gauge';
+import { scoreNumerals } from './score-numerals';
 const icons = {
   pause: '<path d="M8 5v14M16 5v14"/>',
   sound: '<path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/>',
@@ -21,13 +22,12 @@ export class HUD {
     this.root.innerHTML = `
       <div class="vignette"></div>
       <header class="identity">${shield}<div class="wordmark">ROCKET<br>LEAGUE</div><span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> <span id="lighting-label">NIGHT</span> <span>·</span> LOCAL MATCH</span></div></header>
-      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">0</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">5:00</strong><b class="practice-label">FREE PLAY</b></div><div class="team team-orange"><strong id="orange-score">0</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
+      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">${scoreNumerals('0')}</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">${scoreNumerals('5:00')}</strong><b class="practice-label">FREE PLAY</b></div><div class="team team-orange"><strong id="orange-score">${scoreNumerals('0')}</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
       <nav class="top-actions" aria-label="Game settings"><span class="live-label"><i></i> LOCAL PLAY</span><button data-action="sound" aria-label="Toggle sound" title="Toggle sound (M)">${icon('sound')}</button><button data-action="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">${icon('expand')}</button><button data-action="pause" aria-label="Pause game" title="Pause (Esc)">${icon('pause')}</button></nav>
       <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
       <div id="goal-flash"></div>
       <div id="bot-name" class="player-label orange">MAVERICK <span>▾</span></div>
-      <div id="ball-arrow"><span>◇</span> BALL</div>
       <div class="bottom-left"><div class="player-card"><span class="player-avatar">01</span><div><strong>YOU<span class="team-tag">BLUE</span></strong><span id="player-status">OCTANE · READY TO PLAY</span></div></div><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
       <div class="controls-strip"><div><kbd data-hint="forward">W</kbd><span>DRIVE</span></div><div><kbd data-hint="jump">SPACE</kbd><span>JUMP / FLIP</span></div><div><kbd data-hint="boost">SHIFT</kbd><span>BOOST</span></div><div><kbd data-hint="unlimited">B</kbd><span id="infinite-label">UNLIMITED</span></div><button data-action="help" aria-label="Show all controls">${icon('help')}</button></div>
       <div class="boost-hud"></div>
@@ -67,7 +67,8 @@ export class HUD {
       el.dataset.text = text;
     } else if (el.textContent !== text) {
       const scored = (id === 'blue-score' || id === 'orange-score') && Number(text) > Number(el.textContent);
-      el.textContent = text;
+      if (id === 'blue-score' || id === 'orange-score' || id === 'timer') el.innerHTML = scoreNumerals(text);
+      else el.textContent = text;
       if (scored && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
         this.scoreAnimations.get(id)?.forEach(a => a.cancel());
         this.scoreAnimations.set(id, [

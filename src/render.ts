@@ -16,6 +16,7 @@ import { FollowCamera } from './follow-camera';
 import { RocketBoost } from './rocket-boost';
 import { SpeedTrails } from './speed-trails';
 import { FlameSmoke } from './flame-smoke';
+import { BallDirection } from './ball-direction';
 
 export type QualityLevel = 'performance' | 'high' | 'ultra';
 export type BoostStyle = 'classic' | 'inferno';
@@ -31,6 +32,7 @@ export class GameRenderer {
   player: CarModel; bot: CarModel;
   ball: T.Group;
   ballGround: T.Mesh;
+  ballDirection: BallDirection;
   effects: Effects;
   boosts: [RocketBoost, RocketBoost];
   infernos: [FlameSmoke, FlameSmoke];
@@ -86,6 +88,7 @@ export class GameRenderer {
     this.player.root.scale.setScalar(.5); this.bot.root.scale.setScalar(.5);
     this.ball = createBall(); this.scene.add(this.ball);
     this.ballGround = createBallMarker(); this.scene.add(this.ballGround);
+    this.ballDirection = new BallDirection(this.scene);
     // Soft contact shadows preserve weight under the broad stadium lighting.
     for (const owner of [this.player.root, this.bot.root, this.ball]) {
       const shadow = new T.Mesh(new T.PlaneGeometry(2.6, 2.6), new T.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: .57, depthWrite: false }));
@@ -171,6 +174,7 @@ export class GameRenderer {
     this.ballGround.position.copy(ground.position).addScaledVector(ground.normal, .045);
     this.ballGround.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), ground.normal);
     this.ballGround.visible = phase !== 'goal';
+    this.ballDirection.update(this.player.root.position, this.ball.position, !this.ballCam && this.player.root.visible && phase !== 'goal' && phase !== 'ended');
     this.effects.ballTrail(this.ball.position, new T.Vector3().copy(this.physics.ball.linvel()), dt, this.ball.visible);
     for (const obj of this.scene.children) if (obj.name === 'contact-shadow') {
       const owner = obj.userData.owner as T.Object3D; obj.position.set(owner.position.x, .025, owner.position.z); obj.visible = owner.visible;

@@ -1,23 +1,23 @@
-/* Compact arena scoreboard. Team color carries the score; the clock stays neutral. */
-.scoreboard{position:absolute;z-index:2;left:50%;top:16px;transform:translateX(-50%);width:330px;filter:drop-shadow(0 4px 8px #0005);font-variant-numeric:tabular-nums}
-.scoreboard-main{display:grid;grid-template-columns:88px 154px 88px;align-items:stretch;height:78px;gap:0}
-.team{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;isolation:isolate;border-top:1px solid #ffffff70;border-bottom:3px solid var(--team-light);background:linear-gradient(155deg,var(--team-top),var(--team-bottom));color:white}
-.team-blue{--team-top:#178fee;--team-bottom:#0755a0;--team-light:#69d4ff;clip-path:polygon(11px 0,100% 0,100% 100%,0 100%,0 11px)}
-.team-orange{--team-top:#ed963e;--team-bottom:#b75115;--team-light:#ffcf86;clip-path:polygon(0 0,calc(100% - 11px) 0,100% 11px,100% 100%,0 100%)}
-.team:before{content:'';position:absolute;inset:0;z-index:-1;background:repeating-linear-gradient(120deg,transparent 0 14px,#ffffff05 14px 15px)}
-.team strong{font:700 53px/.94 Barlow,'DIN Condensed',sans-serif;letter-spacing:0;text-shadow:0 2px 2px #09234240;min-width:1.25em;text-align:center}
-.team-label{font-size:8px;font-weight:800;letter-spacing:1.4px;margin-top:4px;line-height:1;white-space:nowrap;color:#ffffffdf}
+/* The score wings recede at their outside edges; the central clock stays flat. */
+.scoreboard{position:absolute;z-index:2;left:50%;top:17px;transform:translateX(-50%);width:284px;filter:drop-shadow(0 3px 7px #0005);font-variant-numeric:tabular-nums}
+.scoreboard-main{display:grid;grid-template-columns:72px 140px 72px;align-items:stretch;height:58px;gap:0}
+.team{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;isolation:isolate;border:1px solid #e8f7ff70;background:linear-gradient(160deg,var(--team-top),var(--team-bottom));box-shadow:inset 0 0 17px var(--team-glow);color:#fff;backface-visibility:hidden}
+.team-blue{--team-top:#3d8be9db;--team-bottom:#205caed9;--team-glow:#8ac6ff80;transform-origin:right center;transform:perspective(125px) rotateY(-24deg)}
+.team-orange{--team-top:#dc975fdf;--team-bottom:#b26536e6;--team-glow:#ffd1a180;transform-origin:left center;transform:perspective(125px) rotateY(24deg)}
+.team:before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#fff2,transparent 24%,transparent 76%,#fff2)}
+.team strong{display:flex;justify-content:center;align-items:center;font-size:37px;line-height:1;font-weight:400;max-width:calc(100% - 16px);text-align:center}
+.team-label,.clock>span{display:none}
+.score-number-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.team strong svg,.clock>strong svg{display:block;height:1em;max-width:100%;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #ffffff70)}
 .score-sheen{position:absolute;inset:-30% -90%;background:linear-gradient(110deg,transparent 40%,#fff9 50%,transparent 60%);transform:translateX(-65%);opacity:0;pointer-events:none}
-.clock{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(#07101dda,#091724ef);border-top:1px solid #adcee63d;border-bottom:3px solid #73869970;box-shadow:inset 1px 0 #ffffff12,inset -1px 0 #ffffff12}
-.clock>span{font-size:7px;font-weight:700;letter-spacing:1.7px;color:#9eb1c0;line-height:1.3;margin-bottom:4px;white-space:nowrap}
-.clock>strong{font:700 46px/1 Barlow,'DIN Condensed',sans-serif;letter-spacing:1.5px;color:#fff;text-shadow:0 2px 3px #0006;white-space:nowrap}
-.clock:after{content:'';position:absolute;bottom:7px;left:calc(50% - 11px);width:22px;height:1px;background:#bcd1df40}
+.clock{position:relative;display:flex;align-items:center;justify-content:center;background:linear-gradient(#090e15cf,#12171fbf);border-top:1px solid #d5e6f333;border-bottom:1px solid #c5daeb33}
+.clock>strong{display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1;font-weight:400;max-width:calc(100% - 16px);color:#fff;white-space:nowrap}
 #overtime{display:none;position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);padding:5px 13px;background:#101a27dd;border-bottom:1px solid #ffc26b88;color:#ffd28f;font-size:8px;font-style:normal;font-weight:800;letter-spacing:2.4px;white-space:nowrap}
 .scoreboard.is-overtime .clock{border-bottom-color:#ffbf54}.scoreboard.is-overtime #timer{color:#ffe0a5}
 .scoreboard.is-urgent #timer{color:#ffd193}.scoreboard.is-final-seconds #timer{color:#ff8367}
 .scoreboard.is-final-seconds .clock{border-bottom-color:#ff7656}
 
-.practice-label{display:none;font:700 27px/1 Barlow,sans-serif;letter-spacing:1px;color:#e7f4ff}.scoreboard.is-practice .practice-label{display:block}.scoreboard.is-practice #timer{display:none}.scoreboard.is-practice .clock:after{background:#64c8ff80}
+.practice-label{display:none;font:700 27px/1 Barlow,sans-serif;letter-spacing:1px;color:#e7f4ff}.scoreboard.is-practice .practice-label{display:block}.scoreboard.is-practice #timer{display:none}
 
 /* Segmented boost instrument: an asymmetric fan with a clear lower-right opening. */
 .boost-hud{position:absolute;right:26px;bottom:35px;width:214px;--fuel:#ffbd50;--hot:#fff0bb;--fuel-glow:#ffad3059;--sonic:#6bdcff}
@@ -53,13 +53,13 @@
 .boost-hud.is-paused *{animation-play-state:paused!important}
 @keyframes boost-flow{to{stroke-dashoffset:-20.2}}
 @keyframes boost-breathe{to{opacity:.5;transform:scale(.98)}}
-@media(min-width:1700px){.scoreboard{width:374px;top:20px}.scoreboard-main{grid-template-columns:100px 174px 100px;height:86px}.team strong{font-size:59px}.clock>strong{font-size:50px}.boost-hud{width:240px;right:34px;bottom:39px}.boost-value strong{font-size:54px}}
-@media(max-width:1000px){.scoreboard{width:286px;top:12px}.scoreboard-main{grid-template-columns:76px 134px 76px;height:68px}.team strong{font-size:46px}.clock>strong{font-size:40px}.team-label{font-size:7px}.clock>span{font-size:6px}.boost-hud{width:182px;right:16px;bottom:37px}.boost-value strong{font-size:42px}}
-@media(max-width:650px){.scoreboard{width:228px;top:10px}.scoreboard-main{grid-template-columns:61px 106px 61px;height:60px}.team strong{font-size:39px}.team-label{font-size:6px;letter-spacing:.8px}.clock>strong{font-size:35px}.clock>span{font-size:5px;letter-spacing:1px}.clock:after{bottom:4px}.team{border-bottom-width:2px}.clock{border-bottom-width:2px}.boost-hud{width:150px;right:8px;bottom:56px}.boost-value strong{font-size:34px}.boost-value>span{font-size:7px;letter-spacing:2px;margin-top:4px}.boost-pickup{font-size:14px}.boost-sonic i{width:6px;height:5px}.speed{gap:3px}.speed i{margin:0 2px}#speed{font-size:13px}#drive-state{font-size:5px;letter-spacing:.8px}}
+@media(min-width:1700px){.scoreboard{width:320px;top:20px}.scoreboard-main{grid-template-columns:80px 160px 80px;height:64px}.team strong{font-size:41px}.clock>strong{font-size:27px}.boost-hud{width:240px;right:34px;bottom:39px}.boost-value strong{font-size:54px}}
+@media(max-width:1000px){.scoreboard{width:264px;top:12px}.scoreboard-main{grid-template-columns:67px 130px 67px;height:54px}.team strong{font-size:34px}.clock>strong{font-size:23px}.boost-hud{width:182px;right:16px;bottom:37px}.boost-value strong{font-size:42px}}
+@media(max-width:650px){.scoreboard{width:228px;top:10px}.scoreboard-main{grid-template-columns:61px 106px 61px;height:48px}.team strong{font-size:30px}.clock>strong{font-size:20px}.boost-hud{width:150px;right:8px;bottom:56px}.boost-value strong{font-size:34px}.boost-value>span{font-size:7px;letter-spacing:2px;margin-top:4px}.boost-pickup{font-size:14px}.boost-sonic i{width:6px;height:5px}.speed{gap:3px}.speed i{margin:0 2px}#speed{font-size:13px}#drive-state{font-size:5px;letter-spacing:.8px}}
 @media(max-width:390px){.scoreboard{width:210px}.scoreboard-main{grid-template-columns:56px 98px 56px}.boost-hud{width:134px;right:5px}.boost-value strong{font-size:31px}}
 @media(max-width:650px){.bottom-left{bottom:78px}.controls-strip{bottom:14px}}
 @media(max-width:430px){.top-actions [data-action="fullscreen"]{display:none}}
-@media(max-height:600px) and (min-width:651px){.scoreboard{top:8px}.scoreboard-main{height:58px}.team strong{font-size:39px}.clock>strong{font-size:35px}.clock>span{font-size:6px}.boost-hud{width:153px;bottom:22px;right:16px}.boost-value strong{font-size:35px}.boost-value>span{font-size:7px}.boost-sonic i{width:6px;height:5px}}
+@media(max-height:600px) and (min-width:651px){.scoreboard{top:8px}.scoreboard-main{height:47px}.team strong{font-size:30px}.clock>strong{font-size:21px}.boost-hud{width:153px;bottom:22px;right:16px}.boost-value strong{font-size:35px}.boost-value>span{font-size:7px}.boost-sonic i{width:6px;height:5px}}
 @media(prefers-reduced-motion:reduce){.boost-hud *{animation:none!important;transition:none!important}.boost-flow{display:none}}
 
 @media(max-width:650px){.practice-label{font-size:20px}}
