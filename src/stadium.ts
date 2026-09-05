@@ -62,13 +62,41 @@ function grassDetail() {
   }
   const texture = new T.CanvasTexture(canvas); texture.wrapS = texture.wrapT = T.RepeatWrapping; texture.repeat.set(54, 68); texture.anisotropy = 16; return texture;
 }
-function fadeNearCamera(mat: T.Material) {
-  mat.onBeforeCompile = shader => {
-    shader.vertexShader = 'varying vec3 vCameraRelativePosition;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCameraRelativePosition = mvPosition.xyz;');
-    shader.fragmentShader = 'varying vec3 vCameraRelativePosition;\n' + shader.fragmentShader;
-    shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nfloat visibility = smoothstep(2.5, 5.5, length(vCameraRelativePosition));\nif (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453) > visibility) discard;');
-  };
+const cameraFadeMaterials = new WeakMap<T.Material, T.Material>();
+function fadeNearCamera(mesh: T.Mesh) {
+  if (Array.isArray(mesh.material) || mesh.userData.cameraFadeOverlay) return;
+  const solid = mesh.material;
+  let blended = cameraFadeMaterials.get(solid);
+  if (!blended) {
+    blended = solid.clone(); blended.transparent = true; blended.depthWrite = false; blended.forceSinglePass = true;
+    const originalCompile = solid.onBeforeCompile, originalKey = solid.customProgramCacheKey();
+    for (const [mat, near] of [[solid, false], [blended, true]] as const) {
+      // Distant geometry stays in the opaque pass, preserving net, glass and
+      // stadium depth ordering. Only the nearby part uses alpha blending.
+      mat.customProgramCacheKey = () => `${originalKey}:camera-fade:${near}`;
+      mat.onBeforeCompile = function(shader, renderer) {
+        originalCompile.call(this, shader, renderer);
+        shader.vertexShader = 'varying vec3 vCameraRelativePosition;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCameraRelativePosition = mvPosition.xyz;');
+        shader.fragmentShader = 'varying vec3 vCameraRelativePosition;\n' + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', near ? `
+          float distanceToCamera = length(vCameraRelativePosition);
+          if (distanceToCamera >= 5.5) discard;
+          diffuseColor.a *= smoothstep(2.5, 5.5, distanceToCamera);
+          if (diffuseColor.a < .001) discard;
+          #include <alphatest_fragment>
+        ` : `
+          if (length(vCameraRelativePosition) < 5.5) discard;
+          #include <alphatest_fragment>
+        `);
+      };
+    }
+    cameraFadeMaterials.set(solid, blended);
+  }
+  const overlay = new T.Mesh(mesh.geometry, blended);
+  overlay.name = 'camera-fade-overlay'; overlay.userData.cameraFadeOverlay = true;
+  overlay.receiveShadow = mesh.receiveShadow; overlay.renderOrder = 2;
+  mesh.add(overlay);
 }
 // Reserve the entire goal shell, including a buffer beyond the roof and net.
 // Seating and spectators use the same opening, so neither can enter the goal.
@@ -100,7 +128,9 @@ export class Stadium {
     const glass = honeycombMaterial(.045);
     this.wallMaterial = glass;
     const { goalWidth: g, width: w, length: l, goalDepth: d } = FIELD;
-    const rampMat = new T.MeshStandardMaterial({ color: 0x293e49, metalness: .4, roughness: .65, side: T.DoubleSide }); fadeNearCamera(rampMat);
+    // The camera already sweeps against the floor and ramps. Keep these driving
+    // surfaces solid even when the lens is low or looking down a wall.
+    const rampMat = new T.MeshStandardMaterial({ color: 0x293e49, metalness: .4, roughness: .65, side: T.DoubleSide });
     const netMats = [honeycombMaterial(.065, 1), honeycombMaterial(.065, -1)];
     for (const surface of arenaSurfaces()) {
       const goalIndex = surface.team > 0 ? 0 : 1;
@@ -140,7 +170,7 @@ export class Stadium {
       box(architecture, [.2, .18, 144], [s * 64.4, 17.65, 0], whiteGlow);
       box(architecture, [130, .18, .2], [0, 17.65, s * 76.4], teamMat);
       const goalFrame = createGoalFrame(s); scene.add(goalFrame);
-      goalFrame.traverse(o => { if (o instanceof T.Mesh && o.material instanceof T.MeshStandardMaterial) fadeNearCamera(o.material); });
+      goalFrame.traverse(o => { if (o instanceof T.Mesh && o.name !== 'goal-hex-floor' && o.material instanceof T.MeshStandardMaterial) fadeNearCamera(o); });
       // Recessed stadium service tiers sit beyond the transparent goal shell.
       // They provide a dark backdrop without putting seats or walls in the net.
       for (let tier = 0; tier < 5; tier++) {
@@ -173,7 +203,7 @@ export class Stadium {
     this.makeCrowd(scene);
     this.makeSky(scene);
     mergeStatic(endStands); mergeStatic(architecture);
-    architecture.traverse(o => { if (o instanceof T.Mesh) { o.castShadow = false; if (!Array.isArray(o.material)) fadeNearCamera(o.material); } });
+    architecture.traverse(o => { if (o instanceof T.Mesh) { o.castShadow = false; if (!Array.isArray(o.material) && o.material !== apron.material) fadeNearCamera(o); } });
     const padHalo = glowTexture();
     for (const pad of pads) {
       const model = pad.big ? createLargeBoostPad(padHalo) : createSmallBoostPad();
