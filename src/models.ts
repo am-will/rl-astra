@@ -24,11 +24,11 @@ export function detailedCar(source: T.Group, team: 'blue' | 'orange'): CarModel 
     const original = obj.material as T.MeshStandardMaterial;
     const mat = new T.MeshPhysicalMaterial({ name: original.name, color: original.color, map: original.map, normalMap: original.normalMap,
       metalnessMap: original.metalnessMap, roughnessMap: original.roughnessMap, metalness: original.metalness, roughness: original.roughness });
-    // Broader, softer highlights keep the finish reflective without sharp sun glare.
-    if (mat.name === 'Octane_Body') { mat.color.setHex(team === 'blue' ? 0x078cbd : 0xe87512); mat.metalness = .45; mat.roughness = .36; mat.clearcoat = .6; mat.clearcoatRoughness = .32; mat.specularIntensity = .7; mat.bumpMap = paintGrain(); mat.bumpScale = .0008; racingLivery(mat, team); }
-    if (mat.name === 'Paint') { mat.color.setHex(team === 'blue' ? 0xd86f2b : 0x26343a); mat.metalness = .36; mat.roughness = .35; mat.bumpMap = weaveDetail(); mat.bumpScale = .002; mat.clearcoat = .55; mat.clearcoatRoughness = .3; mat.specularIntensity = .7; }
-    if (mat.name === 'Window') { mat.color.setHex(0x071820); mat.metalness = .48; mat.roughness = .19; mat.clearcoat = .3; mat.clearcoatRoughness = .25; mat.envMapIntensity = .4; mat.specularIntensity = .6; }
-    if (mat.name === 'Dieci_Rim') { mat.color.setHex(0x8b969b); mat.metalness = .94; mat.roughness = .22; mat.clearcoat = .7; mat.clearcoatRoughness = .17; }
+    // Soften both reflection layers: a sharp clear coat can still flash white over rough paint.
+    if (mat.name === 'Octane_Body') { mat.color.setHex(team === 'blue' ? 0x078cbd : 0xe87512); mat.metalness = .38; mat.roughness = .44; mat.clearcoat = .25; mat.clearcoatRoughness = .45; mat.specularIntensity = .45; mat.bumpMap = paintGrain(); mat.bumpScale = .0008; racingLivery(mat, team); }
+    if (mat.name === 'Paint') { mat.color.setHex(team === 'blue' ? 0xd86f2b : 0x26343a); mat.metalness = .3; mat.roughness = .42; mat.bumpMap = weaveDetail(); mat.bumpScale = .002; mat.clearcoat = .25; mat.clearcoatRoughness = .45; mat.specularIntensity = .45; }
+    if (mat.name === 'Window') { mat.color.setHex(0x071820); mat.metalness = .4; mat.roughness = .26; mat.clearcoat = .15; mat.clearcoatRoughness = .4; mat.envMapIntensity = .4; mat.specularIntensity = .4; }
+    if (mat.name === 'Dieci_Rim') { mat.color.setHex(0x8b969b); mat.metalness = .75; mat.roughness = .34; mat.clearcoat = .2; mat.clearcoatRoughness = .42; mat.specularIntensity = .5; }
     if (mat.name === 'Dieci_Tread') { mat.color.setHex(0x17191a); mat.metalness = .05; mat.roughness = .88; mat.bumpMap = treadDetail(); mat.bumpScale = .012; }
     if (mat.name === 'Octane_Chassis') { mat.roughness = .65; mat.metalness = .65; }
     if (mat.map) mat.map.anisotropy = 16;

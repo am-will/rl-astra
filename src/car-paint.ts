@@ -2,12 +2,12 @@ import * as T from 'three';
 import type { CarModel } from './assets';
 
 export const PAINT_JOBS = [
-  { id: 'classic', name: 'Classic', description: 'The original blue finish with copper accents.', color: '#078cbd', accent: '#e4762e', trim: '#d86f2b', rim: '#8b969b', metalness: .45, roughness: .36 },
-  { id: 'ultraviolet', name: 'Ultraviolet', description: 'Deep purple with flowing violet pinstripes. Animated.', color: '#270063', accent: '#7900ef', trim: '#1b0439', rim: '#101019', metalness: .48, roughness: .3 },
-  { id: 'crimson', name: 'Crimson Circuit', description: 'Candy red, pearl-white trim and angular racing graphics.', color: '#b5091c', accent: '#f3f4ef', trim: '#e8eeee', rim: '#f0f5f3', metalness: .42, roughness: .23 },
-  { id: 'rally', name: 'Blue Rally', description: 'Electric blue with clean twin ice-white stripes.', color: '#006de8', accent: '#d8f4ff', trim: '#b6dbea', rim: '#1e3434', metalness: .4, roughness: .27 },
-  { id: 'midnight', name: 'Midnight Camo', description: 'Inky navy camouflage with sharp white pinstriping.', color: '#040638', accent: '#edf3ff', trim: '#e3ebf1', rim: '#0b0e15', metalness: .28, roughness: .38 },
-  { id: 'glacier', name: 'Glacier Crest', description: 'Icy metallic blue with black sweeps and twin crests.', color: '#2a9bd5', accent: '#060b15', trim: '#090e17', rim: '#0b1018', metalness: .58, roughness: .25 },
+  { id: 'classic', name: 'Classic', description: 'The original blue finish with copper accents.', color: '#078cbd', accent: '#e4762e', trim: '#d86f2b', rim: '#8b969b', metalness: .38, roughness: .44 },
+  { id: 'ultraviolet', name: 'Ultraviolet', description: 'Deep purple with flowing violet pinstripes. Animated.', color: '#270063', accent: '#7900ef', trim: '#1b0439', rim: '#101019', metalness: .38, roughness: .43 },
+  { id: 'crimson', name: 'Crimson Circuit', description: 'Candy red, pearl-white trim and angular racing graphics.', color: '#b5091c', accent: '#f3f4ef', trim: '#e8eeee', rim: '#f0f5f3', metalness: .34, roughness: .39 },
+  { id: 'rally', name: 'Blue Rally', description: 'Electric blue with clean twin ice-white stripes.', color: '#006de8', accent: '#d8f4ff', trim: '#b6dbea', rim: '#1e3434', metalness: .32, roughness: .41 },
+  { id: 'midnight', name: 'Midnight Camo', description: 'Inky navy camouflage with sharp white pinstriping.', color: '#040638', accent: '#edf3ff', trim: '#e3ebf1', rim: '#0b0e15', metalness: .24, roughness: .48 },
+  { id: 'glacier', name: 'Glacier Crest', description: 'Icy metallic blue with black sweeps and twin crests.', color: '#2a9bd5', accent: '#060b15', trim: '#090e17', rim: '#0b1018', metalness: .46, roughness: .4 },
 ] as const;
 export type PaintJob = typeof PAINT_JOBS[number]['id'];
 const ENGINE_COLORS: Record<PaintJob, string> = { classic: '#ff941f', ultraviolet: '#a63dff', crimson: '#ff2438', rally: '#23aaff', midnight: '#668bff', glacier: '#36d9ff' };
@@ -135,11 +135,11 @@ export class CarPaint {
       for (const key of ['metalness', 'roughness', 'clearcoat', 'clearcoatRoughness', 'specularIntensity', 'envMapIntensity'] as const) material[key] = original[key];
       if (index > 0) {
         material.color.set(role === 'body' ? job.color : role === 'trim' ? job.trim : job.rim);
-        material.metalness = role === 'body' ? job.metalness : role === 'rim' ? .12 : .38;
-        material.roughness = role === 'body' ? job.roughness : role === 'rim' ? .48 : .28;
-        material.clearcoat = role === 'rim' ? .25 : .8; material.clearcoatRoughness = .26;
-        if (id === 'ultraviolet') { material.specularIntensity = .45; material.clearcoat = .55; }
-        if (id === 'midnight') { material.specularIntensity = .35; material.clearcoat = .35; }
+        material.metalness = role === 'body' ? job.metalness : role === 'rim' ? .12 : .3;
+        material.roughness = role === 'body' ? job.roughness : role === 'rim' ? .48 : .42;
+        material.clearcoat = .25; material.clearcoatRoughness = .45; material.specularIntensity = .45;
+        if (id === 'ultraviolet') { material.specularIntensity = .35; material.clearcoat = .22; }
+        if (id === 'midnight') { material.specularIntensity = .3; material.clearcoat = .18; }
         if (role === 'rim') { material.specularIntensity = .12; material.envMapIntensity = .18; material.clearcoat = .04; }
       }
       if (role === 'body') { uniforms.paintJob.value = index; uniforms.paintAccent.value.set(job.accent); }
