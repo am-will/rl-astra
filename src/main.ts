@@ -1,4 +1,5 @@
 import './style.css';
+import './match-hud.css';
 import { Game } from './game';
 
 const game = new Game();

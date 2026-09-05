@@ -17,6 +17,7 @@ npm run preview   # Serve the production build
 npm test          # Gameplay, arena, aerial control, keyboard/controller, and settings checks
 npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
 npm run test:speed    # Supersonic timing, momentum after ball hits, and wheel trails
+npm run test:hud      # Boost gauge, pickup feedback, scoreboard and compact layouts
 npm run test:feel  # Impact calibration, goal clearance/ramp driving, camera framing and refresh rates
 npm run test:impact # Goal blast control, demolitions, subtle ball trail, clear goal net, saved quality
 npm run test:impact-visuals # Goal interior and demolition drive-through screenshots
@@ -84,6 +85,7 @@ The pause menu includes solo practice, a five-minute match against Maverick, res
 - `src/demolition.ts`: Reusable fireballs, expanding shock rings, spark streaks, tumbling tires/body fragments, BOOM lettering, and thin smoke that clears quickly and fades near the camera.
 - `src/goal-explosion.ts`, `src/blast-pass.ts`: Stellar Collapse goal celebration: plasma corona, singularity and accretion disk, 15,000 GPU particles, branching lightning, curved energy jets, ground shockwave, screen refraction, dynamic lighting, and bass/rumble audio. Geometry is reused between goals.
 - `src/ball-marker.ts`: High-contrast, height-scaled ground reticle, projected onto the floor and ramps.
+- `src/boost-gauge.ts`, `src/match-hud.css`: Segmented amber boost dial with smooth fuel sweep, trailing drain glow, animated pickup surges, boost flow, low-fuel and supersonic states; compact score tiles with goal animations and overtime styling. Reduced-motion preferences suppress decorative animations.
 - `src/controls.ts`, `src/bindings.ts`: Keyboard and polled Gamepad API inputs, analog deadzones, edge-triggered actions, safe hotplug handling, validated persistent bindings.
 - `src/controls-menu.ts`, `src/hud.ts`, `src/style.css`: Rebinding/capture UI, controller status and live monitor, tuning, responsive match UI and active-device hints.
 

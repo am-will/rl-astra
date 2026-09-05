@@ -1,5 +1,6 @@
 import type { Controls } from './controls';
 import type { ActionId } from './bindings';
+import { BoostGauge } from './boost-gauge';
 const icons = {
   pause: '<path d="M8 5v14M16 5v14"/>',
   sound: '<path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/>',
@@ -13,12 +14,14 @@ export class HUD {
   root: HTMLElement;
   onAction: (action: string) => void = () => {};
   messageUntil = 0;
+  private boostGauge: BoostGauge;
+  private scoreAnimations = new Map<string, Animation[]>();
   constructor() {
     this.root = document.createElement('main'); this.root.id = 'hud'; document.querySelector('#app')!.append(this.root);
     this.root.innerHTML = `
       <div class="vignette"></div>
       <header class="identity">${shield}<div class="wordmark">ROCKET<br>LEAGUE</div><span class="identity-divider"></span><div class="venue"><span class="eyebrow">THE HOME OF CHAMPIONS</span><strong>CHAMPIONS FIELD</strong><span class="venue-sub"><i></i> NIGHT <span>·</span> LOCAL MATCH</span></div></header>
-      <div class="scoreboard" aria-label="Match scoreboard"><div class="team team-blue"><span>YOU</span><strong id="blue-score">0</strong></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">5:00</strong><i id="overtime">OVERTIME</i></div><div class="team team-orange"><strong id="orange-score">0</strong><span>MAVERICK</span></div></div>
+      <div class="scoreboard" aria-label="Match scoreboard"><div class="scoreboard-main"><div class="team team-blue"><strong id="blue-score">0</strong><span class="team-label">YOU</span><i class="score-sheen"></i></div><div class="clock"><span id="match-type">EXHIBITION · 1V1</span><strong id="timer">5:00</strong></div><div class="team team-orange"><strong id="orange-score">0</strong><span class="team-label">MAVERICK</span><i class="score-sheen"></i></div></div><i id="overtime">OVERTIME</i></div>
       <nav class="top-actions" aria-label="Game settings"><span class="live-label"><i></i> LOCAL PLAY</span><button data-action="sound" aria-label="Toggle sound" title="Toggle sound (M)">${icon('sound')}</button><button data-action="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">${icon('expand')}</button><button data-action="pause" aria-label="Pause game" title="Pause (Esc)">${icon('pause')}</button></nav>
       <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
@@ -27,12 +30,13 @@ export class HUD {
       <div id="ball-arrow"><span>◇</span> BALL</div>
       <div class="bottom-left"><div class="player-card"><span class="player-avatar">01</span><div><strong>YOU<span class="team-tag">BLUE</span></strong><span id="player-status">OCTANE · READY TO PLAY</span></div></div><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
       <div class="controls-strip"><div><kbd data-hint="forward">W</kbd><span>DRIVE</span></div><div><kbd data-hint="jump">SPACE</kbd><span>JUMP / FLIP</span></div><div><kbd data-hint="boost">SHIFT</kbd><span>BOOST</span></div><div><kbd data-hint="unlimited">B</kbd><span id="infinite-label">UNLIMITED</span></div><button data-action="help" aria-label="Show all controls">${icon('help')}</button></div>
-      <div class="boost-hud"><div class="boost-ring"><svg viewBox="0 0 180 180"><circle class="boost-track" cx="90" cy="90" r="74"/><circle id="boost-arc" cx="90" cy="90" r="74"/><circle class="boost-inner" cx="90" cy="90" r="62"/></svg><div class="boost-value"><strong id="boost">100</strong><span>BOOST</span></div></div><div class="speed"><span id="speed">0</span> KM/H <i></i> <span id="drive-state">GROUNDED</span></div></div>
+      <div class="boost-hud"></div>
       <div class="session-footer"><span>CHAMPIONS FIELD</span><span>EXHIBITION</span><span id="fps">60 FPS</span></div>
       <div id="pause-panel" class="overlay" hidden><section class="menu"><span class="eyebrow">CHAMPIONS FIELD / LOCAL PLAY</span><h2 id="pause-title">TIME OUT.</h2><p id="pause-description">Take a breath. The field will be here.</p><button class="primary-button" data-action="resume">BACK TO THE FIELD ${icon('arrow')}</button><div class="menu-options"><button data-action="bindings">CONTROLS & BINDINGS <span>KEYBOARD / CONTROLLER</span></button><button data-action="restart">RESTART MATCH <span>↻</span></button><button data-action="mode">GAME MODE <span id="mode-value">1V1 · MAVERICK</span></button><button data-action="unlimited">UNLIMITED BOOST <span id="unlimited-value">OFF</span></button><button data-action="quality">VISUAL QUALITY <span id="quality-value">PERFORMANCE</span></button><button data-action="sound">SOUND <span id="sound-value">ON</span></button></div><button class="text-button" data-action="help">VIEW CONTROLS <kbd>H</kbd></button><div class="menu-footnote">BUILT FOR THE LOVE OF THE GAME.</div></section></div>
       <div id="help-panel" class="overlay" hidden><section class="menu help-menu"><span class="eyebrow">A LITTLE CONTROL GOES A LONG WAY</span><h2>OWN THE FIELD.</h2><div class="control-list"><div><span>Drive / steer</span><kbd>W A S D / ↑ ← ↓ →</kbd></div><div><span>Jump · hold for height</span><kbd>SPACE</kbd></div><div><span>Double jump / directional flip</span><kbd>SPACE × 2</kbd></div><div><span>Rocket boost</span><kbd>SHIFT</kbd></div><div><span>Air pitch / yaw</span><kbd>W S / A D</kbd></div><div><span>Air roll left / right</span><kbd>Q / E</kbd></div><div><span>E-brake / powerslide</span><kbd>CTRL / PGDN</kbd></div><div><span>Ball camera</span><kbd>C</kbd></div><div><span>Unlimited boost</span><kbd>B</kbd></div><div><span>Reset car</span><kbd>R</kbd></div><div><span>Pause / sound / fullscreen</span><kbd>ESC / M / F</kbd></div></div><p class="tip">Land your wheels on the ball to recover your flip. Pick up small pads for 12 boost, or gold orbs for a full tank.</p><button class="text-button" data-action="bindings">CUSTOMIZE KEYBOARD & CONTROLLER →</button><br><button class="primary-button" data-action="close-help">LET'S PLAY ${icon('arrow')}</button></section></div>
       <div id="loading"><div class="loading-mark">${shield}</div><strong>LIGHTING UP THE FIELD</strong><span>Starting the physics engine…</span><div class="loading-line"></div></div>
     `;
+    this.boostGauge = new BoostGauge(this.root.querySelector('.boost-hud')!);
     this.root.addEventListener('click', e => { const button = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-action]'); if (button) { button.blur(); this.onAction(button.dataset.action!); } });
   }
   bindings(controls: Controls) {
@@ -61,7 +65,17 @@ export class HUD {
       if (!face) { face = document.createElement('span'); face.className = 'comic-face'; el.replaceChildren(face); }
       if (face.textContent !== text) face.textContent = text;
       el.dataset.text = text;
-    } else if (el.textContent !== text) el.textContent = text;
+    } else if (el.textContent !== text) {
+      const scored = (id === 'blue-score' || id === 'orange-score') && Number(text) > Number(el.textContent);
+      el.textContent = text;
+      if (scored && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        this.scoreAnimations.get(id)?.forEach(a => a.cancel());
+        this.scoreAnimations.set(id, [
+          el.animate([{ transform: 'translateY(6px) scale(.75)', opacity: .35 }, { transform: 'translateY(-2px) scale(1.13)', opacity: 1, offset: .45 }, { transform: 'none', opacity: 1 }], { duration: 440, easing: 'cubic-bezier(.16,1,.3,1)' }),
+          el.parentElement!.querySelector('.score-sheen')!.animate([{ transform: 'translateX(-65%)', opacity: 0 }, { opacity: .65, offset: .2 }, { transform: 'translateX(65%)', opacity: 0 }], { duration: 650, easing: 'ease-out' }),
+        ]);
+      }
+    }
   }
   ready() { this.el('loading').remove(); }
   message(title: string, kicker = '', sub = '', style = '') {
@@ -74,13 +88,16 @@ export class HUD {
     ], { duration: 330, easing: 'cubic-bezier(.16,1,.3,1)' });
   }
   toast(text: string) { this.set('event-toast', text); this.el('event-toast').classList.add('visible'); this.messageUntil = performance.now() + 2200; }
-  update(data: { blue: number; orange: number; time: number; boost: number; speed: number; supersonic: boolean; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; }) {
+  boostPickup(big: boolean) { this.boostGauge.pickup(big); }
+  update(data: { blue: number; orange: number; time: number; boost: number; boosting: boolean; speed: number; supersonic: boolean; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; }, dt = 1 / 60) {
     this.set('blue-score', data.blue); this.set('orange-score', data.orange);
     const t = Math.ceil(Math.abs(data.time)); this.set('timer', `${data.overtime ? '+' : ''}${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`);
     this.el('overtime').style.display = data.overtime ? 'block' : 'none';
-    this.set('boost', data.unlimited ? '∞' : Math.ceil(data.boost));
-    this.el('boost-arc').style.strokeDashoffset = String(465 * (1 - (data.unlimited ? 1 : data.boost / 100)));
-    this.el('boost-arc').classList.toggle('low', data.boost < 20 && !data.unlimited);
+    const scoreboard = this.root.querySelector('.scoreboard')!;
+    scoreboard.classList.toggle('is-overtime', data.overtime);
+    scoreboard.classList.toggle('is-urgent', data.time <= 30 && !data.overtime);
+    scoreboard.classList.toggle('is-final-seconds', data.time <= 10 && !data.overtime);
+    this.boostGauge.update(data.boost, data.unlimited, data.boosting, data.supersonic, dt);
     this.set('speed', Math.round(data.speed * 3.6)); this.set('drive-state', data.grounded ? 'GROUNDED' : 'AIRBORNE');
     this.set('player-status', data.supersonic ? 'SUPERSONIC' : data.grounded ? 'OCTANE · BLUE TEAM' : 'OCTANE · AIRBORNE');
     this.set('fps', `${Math.round(data.fps)} FPS`);

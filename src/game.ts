@@ -50,7 +50,7 @@ export class Game {
       this.view.audio.hit(speed); this.view.shake = Math.min(.65, speed / 50);
       if (player && speed > 18) this.hud.toast('POWER HIT  +20');
     };
-    this.physics.onPad = big => { this.padCount++; this.view.audio.tone(big ? 880 : 620, .17, .1, 1250); if (big) this.hud.toast('BOOST RECHARGED'); };
+    this.physics.onPad = big => { this.padCount++; this.hud.boostPickup(big); this.view.audio.tone(big ? 880 : 620, .17, .1, 1250); if (big) this.hud.toast('BOOST RECHARGED'); };
     this.physics.onFlipReset = () => { this.hud.toast('FLIP RESET  +50'); this.view.audio.tone(1200, .3, .15, 1800); };
     this.physics.onDemo = car => {
       const pos = new Vector3().copy(car.body.translation());
@@ -177,7 +177,7 @@ export class Game {
     this.view.update(frozen ? 0 : dt, this.phase, this.celebration, frozen ? 1 : this.accumulator / STEP);
     this.view.draw();
     const car = this.physics.player;
-    this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, speed: car.speed, supersonic: car.supersonic, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime });
+    this.hud.update({ blue: this.blue, orange: this.orange, time: Math.max(0, this.remaining), boost: car.boost, boosting: car.boosting && !frozen, speed: car.speed, supersonic: car.supersonic, unlimited: this.physics.unlimited, grounded: car.grounded, fps: this.fps, overtime: this.overtime }, frozen ? 0 : dt);
     this.positionLabels();
   }
   positionLabels() {
