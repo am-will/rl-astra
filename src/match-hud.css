@@ -1,16 +1,16 @@
 /* The score wings recede at their outside edges; the central clock stays flat. */
-.scoreboard{position:absolute;z-index:2;left:50%;top:17px;transform:translateX(-50%);width:284px;filter:drop-shadow(0 3px 7px #0005);font-variant-numeric:tabular-nums}
+.scoreboard{position:absolute;z-index:2;left:50%;top:17px;transform:translateX(-50%);width:284px;filter:drop-shadow(0 2px 4px #0003);font-variant-numeric:tabular-nums}
 .scoreboard-main{display:grid;grid-template-columns:72px 140px 72px;align-items:stretch;height:58px;gap:0}
-.team{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;isolation:isolate;border:1px solid #e8f7ff70;background:linear-gradient(160deg,var(--team-top),var(--team-bottom));box-shadow:inset 0 0 17px var(--team-glow);color:#fff;backface-visibility:hidden}
-.team-blue{--team-top:#3d8be9db;--team-bottom:#205caed9;--team-glow:#8ac6ff80;transform-origin:right center;transform:perspective(125px) rotateY(-24deg)}
-.team-orange{--team-top:#dc975fdf;--team-bottom:#b26536e6;--team-glow:#ffd1a180;transform-origin:left center;transform:perspective(125px) rotateY(24deg)}
-.team:before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#fff2,transparent 24%,transparent 76%,#fff2)}
+.team{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;isolation:isolate;border:1px solid #e8f7ff2b;background:linear-gradient(160deg,var(--team-top),var(--team-bottom));box-shadow:inset 0 0 12px var(--team-glow);color:#fff;backface-visibility:hidden}
+.team-blue{--team-top:#3894ff9c;--team-bottom:#236bc754;--team-glow:#8ac6ff26;transform-origin:right center;transform:perspective(125px) rotateY(-24deg)}
+.team-orange{--team-top:#ffb66c9c;--team-bottom:#c77a3454;--team-glow:#ffd1a126;transform-origin:left center;transform:perspective(125px) rotateY(24deg)}
+.team:before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#fff1,transparent 24%,transparent 76%,#fff1)}
 .team strong{display:flex;justify-content:center;align-items:center;font-size:37px;line-height:1;font-weight:400;max-width:calc(100% - 16px);text-align:center}
 .team-label,.clock>span{display:none}
 .score-number-text{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.team strong svg,.clock>strong svg{display:block;height:1em;max-width:100%;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #ffffff70)}
+.team strong svg,.clock>strong svg{display:block;height:1em;max-width:100%;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 2px #ffffff60)}
 .score-sheen{position:absolute;inset:-30% -90%;background:linear-gradient(110deg,transparent 40%,#fff9 50%,transparent 60%);transform:translateX(-65%);opacity:0;pointer-events:none}
-.clock{position:relative;display:flex;align-items:center;justify-content:center;background:linear-gradient(#090e15cf,#12171fbf);border-top:1px solid #d5e6f333;border-bottom:1px solid #c5daeb33}
+.clock{position:relative;display:flex;align-items:center;justify-content:center;background:linear-gradient(#050a126e,#0a142347);border-top:1px solid #d5e6f314;border-bottom:1px solid #c5daeb1f}
 .clock>strong{display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1;font-weight:400;max-width:calc(100% - 16px);color:#fff;white-space:nowrap}
 #overtime{display:none;position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);padding:5px 13px;background:#101a27dd;border-bottom:1px solid #ffc26b88;color:#ffd28f;font-size:8px;font-style:normal;font-weight:800;letter-spacing:2.4px;white-space:nowrap}
 .scoreboard.is-overtime .clock{border-bottom-color:#ffbf54}.scoreboard.is-overtime #timer{color:#ffe0a5}

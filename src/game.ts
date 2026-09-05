@@ -207,8 +207,13 @@ export class Game {
     this.positionLabels();
   }
   positionLabels() {
-    const label = this.hud.el('bot-name'), projected = this.view.bot.root.position.clone().add(new Vector3(0, 2, 0)).project(this.view.camera);
-    label.style.display = this.physics.botEnabled && this.physics.bot.demolished <= 0 && Math.abs(projected.x) < .95 && Math.abs(projected.y) < .85 && projected.z < 1 ? 'block' : 'none';
+    const label = this.hud.el('bot-name'), bot = this.view.bot.root;
+    // Clear the roof or raised nose without floating far above a grounded car.
+    const right = new Vector3(1, 0, 0).applyQuaternion(bot.quaternion), up = new Vector3(0, 1, 0).applyQuaternion(bot.quaternion), forward = new Vector3(0, 0, 1).applyQuaternion(bot.quaternion);
+    const height = .6 * Math.abs(right.y) + .45 * Math.abs(up.y) + .9 * Math.abs(forward.y) + .3;
+    const projected = bot.position.clone().add(new Vector3(0, height, 0)).project(this.view.camera);
+    label.hidden = !(this.physics.botEnabled && this.physics.bot.demolished <= 0 && Math.abs(projected.x) < .95 && Math.abs(projected.y) < .85 && projected.z >= -1 && projected.z < 1);
+    this.hud.opponentBoost(this.physics.bot.boost);
     label.style.left = `${(projected.x * .5 + .5) * innerWidth}px`; label.style.top = `${(-projected.y * .5 + .5) * innerHeight}px`;
   }
   snapshot() {

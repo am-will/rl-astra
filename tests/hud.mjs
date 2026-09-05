@@ -11,7 +11,7 @@ try {
   page.on('console', e => { if (e.type() === 'error') errors.push(e.text()); });
   await page.goto(process.env.GAME_URL || 'http://127.0.0.1:5179');
   await page.waitForFunction(() => window.__game?.view && !document.querySelector('#loading'));
-  check('Initial boost meter is full and accessible', await page.getByRole('meter', { name: 'Boost' }).getAttribute('aria-valuenow') === '100' && await page.locator('#boost').innerText() === '100', {});
+  check('Initial boost meter is full and accessible', await page.getByRole('meter', { name: 'Boost', exact: true }).getAttribute('aria-valuenow') === '100' && await page.locator('#boost').innerText() === '100', {});
   await page.keyboard.down('w');
   await page.waitForFunction(() => window.__game.phase === 'playing');
   await page.keyboard.down('Shift');
@@ -49,7 +49,7 @@ try {
   check('An empty tank has no live segments or fuel tip', await page.evaluate(() => document.querySelector('#boost').textContent === '0' && document.querySelector('.boost-tip').style.opacity === '0' && document.querySelector('.boost-hud').classList.contains('is-empty')), {});
   await page.keyboard.press('b');
   await page.waitForFunction(() => document.querySelector('#boost').textContent === '∞');
-  check('Unlimited boost fills the arc and displays infinity', await page.evaluate(() => document.querySelector('#boost').textContent === '∞' && document.querySelector('#boost-arc').style.strokeDashoffset === '0' && document.querySelector('[role="meter"]').getAttribute('aria-valuetext') === 'Unlimited boost'), {});
+  check('Unlimited boost fills the arc and displays infinity', await page.evaluate(() => document.querySelector('#boost').textContent === '∞' && document.querySelector('#boost-arc').style.strokeDashoffset === '0' && document.querySelector('.boost-hud [role="meter"]').getAttribute('aria-valuetext') === 'Unlimited boost'), {});
   await page.keyboard.press('b');
 
   await page.evaluate(() => { const g = window.__game; g.blue = 0; g.orange = 0; g.score('blue'); });
@@ -60,6 +60,37 @@ try {
   await page.evaluate(() => { const g = window.__game; g.scenario('drive'); g.overtime = true; g.remaining = 17; });
   await page.waitForFunction(() => document.querySelector('#timer').textContent === '+0:17');
   check('Overtime remains visible in the compact scoreboard', await page.locator('#overtime').isVisible() && await page.locator('.scoreboard').evaluate(e => e.classList.contains('is-overtime')), {});
+
+  const opponent = await page.evaluate(async () => {
+    const g = window.__game, { emptyInput } = await import('/src/config.ts');
+    g.scenario('drive'); g.physics.botEnabled = true; g.physics.unlimited = false;
+    g.physics.resetCar(g.physics.bot, 0, 10); g.physics.bot.boost = 80; g.physics.player.boost = 7;
+    g.view.update(1 / 60, g.phase); g.positionLabels();
+    const read = () => ({ actual: g.physics.bot.boost, shown: Number(document.querySelector('#opponent-boost').getAttribute('aria-valuenow')), fill: Number(document.querySelector('#opponent-boost-fill').getAttribute('height')) / 19 * 100 });
+    const before = read();
+    for (let i = 0; i < 60; i++) g.physics.step(emptyInput(), { ...emptyInput(), throttle: 1, boost: true });
+    g.positionLabels(); const drained = read();
+    const pickups = [];
+    for (const big of [false, true]) {
+      const pad = g.physics.pads.find(p => p.big === big); pad.cooldown = 0;
+      g.physics.resetCar(g.physics.bot, pad.x, pad.z); g.physics.bot.boost = 15;
+      g.physics.step(emptyInput(), emptyInput()); g.positionLabels(); pickups.push(read());
+    }
+    g.physics.unlimited = true; g.physics.bot.boost = 47; g.positionLabels(); const unlimited = read();
+    g.physics.unlimited = false;
+    return { before, drained, pickups, unlimited };
+  });
+  check('Opponent nameplate shows its own fuel and drains with real boost use', opponent.before.shown === 80 && opponent.drained.actual < 70 && Math.abs(opponent.drained.shown - opponent.drained.actual) < .06 && Math.abs(opponent.drained.fill - opponent.drained.actual) < .06, opponent);
+  check('Opponent boost circle refills from both pad types and ignores player unlimited mode', opponent.pickups[0].shown === 27 && opponent.pickups[1].shown === 100 && opponent.pickups[1].fill === 100 && opponent.unlimited.shown === 47, opponent);
+  const nameplate = await page.evaluate(() => {
+    const g = window.__game, label = document.querySelector('#bot-name');
+    g.physics.resetCar(g.physics.bot, 0, 10); g.view.cameraReady = false; g.view.update(1 / 60, g.phase); g.positionLabels(); const visible = !label.hidden;
+    g.physics.demolish(g.physics.bot); g.positionLabels(); const demolished = label.hidden;
+    g.physics.resetCar(g.physics.bot, 0, 10); g.view.update(1 / 60, g.phase); g.positionLabels(); const respawned = !label.hidden;
+    g.physics.botEnabled = false; g.positionLabels(); const solo = label.hidden;
+    return { visible, demolished, respawned, solo };
+  });
+  check('Opponent nameplate hides on demolition and in solo practice, then returns on respawn', Object.values(nameplate).every(Boolean), nameplate);
 
   const layouts = [];
   for (const [width, height] of [[1920,1080],[900,600],[390,844],[320,568],[844,390]]) {

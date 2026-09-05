@@ -17,6 +17,7 @@ export class HUD {
   onAction: (action: string) => void = () => {};
   messageUntil = 0;
   private boostGauge: BoostGauge;
+  private opponentBoostLevel = -1;
   private scoreAnimations = new Map<string, Animation[]>();
   constructor() {
     this.root = document.createElement('main'); this.root.id = 'hud'; document.querySelector('#app')!.append(this.root);
@@ -28,7 +29,7 @@ export class HUD {
       <div id="center-message" class="center-message ready"><span id="message-kicker">THE STAGE IS YOURS</span><h1 id="message-title" data-text="MAKE YOUR PLAY."><span class="comic-face">MAKE YOUR PLAY.</span></h1><p id="message-sub"><kbd>W</kbd> DRIVE TO KICK OFF</p></div>
       <div id="event-toast" class="event-toast" aria-live="polite"></div>
       <div id="goal-flash"></div>
-      <div id="bot-name" class="player-label orange">MAVERICK <span>▾</span></div>
+      <div id="bot-name" class="player-label orange" hidden><span id="opponent-boost" class="nameplate-boost" role="meter" aria-label="Maverick boost" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="opponent-boost-clip"><circle cx="12" cy="12" r="9.5"/></clipPath></defs><rect id="opponent-boost-fill" x="2.5" y="2.5" width="19" height="19" clip-path="url(#opponent-boost-clip)"/><circle class="nameplate-boost-outline" cx="12" cy="12" r="10"/></svg></span><span class="nameplate-name">MAVERICK</span></div>
       <div class="bottom-left"><div class="player-card"><span class="player-avatar">01</span><div><strong>YOU<span class="team-tag">BLUE</span></strong><span id="player-status">OCTANE · READY TO PLAY</span></div></div><button class="camera-button" data-action="camera"><span class="camera-indicator" id="camera-indicator"></span><strong>BALL CAM</strong><span id="camera-status">OFF</span><kbd data-hint="camera">C</kbd></button><button class="ball-cam-corner" data-action="camera" aria-label="Toggle ball camera" hidden><span class="ball-cam-title"><i></i>BALL CAM</span><small>PRESS <kbd id="ball-cam-key" data-hint="camera">C</kbd> TO TOGGLE</small></button><span class="camera-hint">KEEP YOUR EYES ON THE PLAY</span></div>
       <div class="controls-strip"><div><kbd data-hint="forward">W</kbd><span>DRIVE</span></div><div><kbd data-hint="jump">SPACE</kbd><span>JUMP / FLIP</span></div><div><kbd data-hint="boost">SHIFT</kbd><span>BOOST</span></div><div><kbd data-hint="unlimited">B</kbd><span id="infinite-label">UNLIMITED</span></div><button data-action="help" aria-label="Show all controls">${icon('help')}</button></div>
       <div class="boost-hud"></div>
@@ -93,6 +94,14 @@ export class HUD {
   }
   toast(text: string) { this.set('event-toast', text); this.el('event-toast').classList.add('visible'); this.messageUntil = performance.now() + 2200; }
   boostPickup(big: boolean) { this.boostGauge.pickup(big); }
+  opponentBoost(value: number) {
+    const boost = Math.round(Math.max(0, Math.min(100, value)) * 10) / 10;
+    if (boost === this.opponentBoostLevel) return;
+    this.opponentBoostLevel = boost;
+    this.el('opponent-boost').setAttribute('aria-valuenow', String(boost));
+    const fill = this.el('opponent-boost-fill'), height = 19 * boost / 100;
+    fill.setAttribute('height', String(height)); fill.setAttribute('y', String(21.5 - height));
+  }
   update(data: { blue: number; orange: number; time: number; boost: number; boosting: boolean; speed: number; supersonic: boolean; unlimited: boolean; grounded: boolean; fps: number; overtime: boolean; practice?: boolean; }, dt = 1 / 60) {
     this.set('blue-score', data.blue); this.set('orange-score', data.orange);
     const t = Math.ceil(Math.abs(data.time)); this.set('timer', `${data.overtime ? '+' : ''}${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`);
