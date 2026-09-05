@@ -1,7 +1,7 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
-const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox']});
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox']});
 const results=[],errors=[];const check=(name,pass,detail)=>{assert.ok(pass,`${name}: ${JSON.stringify(detail)}`);results.push({name,detail});console.log(`PASS ${name}`);};
 try{
  const p=await browser.newPage({viewport:{width:1440,height:900}});p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -36,30 +36,33 @@ try{
    g.view.update(1/60,'playing');rows.push({owner,hits:g.hits-before,particles:fx.particles.length,drawn:fx.points.geometry.drawRange.count,streak:fx.ballStreak.mesh.visible});
   }return rows;
  });
- check('Player and bot ball contacts produce no impact particles or normal-speed trail',contacts.every(c=>c.hits>0&&c.particles===0&&c.drawn===0&&!c.streak),contacts);
+ check('Player and bot ball contacts produce no impact particles',contacts.every(c=>c.hits>0&&c.particles===0&&c.drawn===0),contacts);
  const trail=await p.evaluate(async()=>{
   const T=await import('/node_modules/.vite/deps/three.js'),{BallSpeedTrail}=await import('/src/ball-speed-trail.ts'),rows=[];
   for(const hz of [30,60,144]){
    const scene=new T.Scene(),trail=new BallSpeedTrail(scene),pos=new T.Vector3(0,4,0),velocity=new T.Vector3(18,-6,-30).setLength(36),u=trail.mesh.material.uniforms;
-   for(let i=0;i<hz;i++)trail.update(pos,new T.Vector3(0,0,-20),1/hz,true);
+   for(let i=0;i<hz;i++)trail.update(pos,new T.Vector3(0,0,-10),1/hz,true);
    const slowHidden=!trail.mesh.visible;
+   for(let i=0;i<hz;i++)trail.update(pos,new T.Vector3(0,0,-18),1/hz,true);
+   const moderateVisible=trail.mesh.visible,moderateStrength=u.strength.value,moderateLength=u.head.value.distanceTo(u.tail.value);
    for(let i=0;i<hz;i++){pos.addScaledVector(velocity,1/hz);trail.update(pos,velocity,1/hz,true);}
    const visible=trail.mesh.visible,strength=u.strength.value,delta=u.tail.value.clone().sub(u.head.value),length=delta.length();
    const aligned=delta.clone().normalize().dot(velocity.clone().normalize()),headOffset=pos.distanceTo(u.head.value),before=u.head.value.toArray().concat(u.tail.value.toArray(),u.strength.value);
    trail.update(pos,velocity,0,true);const paused=before.every((n,i)=>n===u.head.value.toArray().concat(u.tail.value.toArray(),u.strength.value)[i]);
-   for(let i=0;i<Math.ceil(hz*.1);i++)trail.update(pos,new T.Vector3(0,0,-18),1/hz,true);
+   for(let i=0;i<Math.ceil(hz*.1);i++)trail.update(pos,new T.Vector3(0,0,-10),1/hz,true);
    const fading=u.strength.value;
    for(let i=0;i<hz;i++)trail.update(pos,new T.Vector3(),1/hz,true);
    const faded=!trail.mesh.visible;
    for(let i=0;i<hz;i++)trail.update(pos,velocity,1/hz,true);
    trail.update(pos,velocity,0,false);
-   rows.push({hz,slowHidden,visible,strength,length,aligned,headOffset,paused,fading,faded,hiddenClears:!trail.mesh.visible,objects:scene.children.length,vertices:trail.mesh.geometry.getAttribute('position').count});
+   rows.push({hz,slowHidden,moderateVisible,moderateStrength,moderateLength,visible,strength,length,aligned,headOffset,paused,fading,faded,hiddenClears:!trail.mesh.visible,objects:scene.children.length,vertices:trail.mesh.geometry.getAttribute('position').count});
    trail.mesh.geometry.dispose();trail.mesh.material.dispose();
   }return rows;
  });
  check('Supersonic ball has one straight streak attached behind it, with no particle wake',trail.every(t=>t.slowHidden&&t.visible&&t.objects===1&&t.vertices===4&&t.aligned<-.999&&Math.abs(t.headOffset-.736)<.001),trail);
+ check('Moderate hits show a substantial streak before supersonic speed',trail.every(t=>t.moderateVisible&&t.moderateStrength>.45&&t.moderateStrength<.55&&t.moderateLength>11.9&&t.moderateLength<12.1),trail);
  check('Ball streak fades out as speed drops and clears when the ball is hidden',trail.every(t=>t.paused&&t.fading>0&&t.fading<t.strength*.3&&t.faded&&t.hiddenClears),trail);
- check('Streak length and brightness stay consistent at 30, 60 and 144 Hz',trail.every(t=>t.length>8.9&&t.length<9.01&&t.strength>.99),trail);
+ check('Long streak length and brightness stay consistent at 30, 60 and 144 Hz',trail.every(t=>t.length>17.9&&t.length<18.01&&t.strength>.99),trail);
  const demoReadability=await p.evaluate(async()=>{const T=await import('/node_modules/.vite/deps/three.js'),fx=window.__game.view.effects.demolitions;fx.reset();fx.trigger(new T.Vector3(),new T.Vector3(),new T.Quaternion(),0xff942e);const b=fx.bursts[0];fx.update(.35);fx.updateCamera(new T.Vector3(0,2.6,12));const distant=b.word.material.opacity;fx.update(0);fx.updateCamera(new T.Vector3(0,2.6,2));return{distant,near:b.word.material.opacity};});
  check('Demolition lettering clears the view when driven through',demoReadability.distant>.9&&demoReadability.near<.01,demoReadability);
  const quality=await p.evaluate(()=>{const v=window.__game.view;return{high:v.quality,bloom:v.bloom.enabled,ratio:v.renderer.getPixelRatio(),label:document.querySelector('#quality-value').textContent};});

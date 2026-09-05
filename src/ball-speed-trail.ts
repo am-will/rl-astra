@@ -41,10 +41,10 @@ export class BallSpeedTrail {
   update(position: T.Vector3, velocity: T.Vector3, dt: number, visible: boolean) {
     if (!visible) { this.reset(); return; }
     const speed = velocity.length();
-    // Use the game's supersonic speed band. Ordinary passes and touches stay clean.
-    const target = T.MathUtils.smoothstep(speed, 22, 34);
+    // Bring the streak in on moderate hits and reach full strength on firm shots.
+    const target = T.MathUtils.smoothstep(speed, 12, 24);
     this.strength = T.MathUtils.damp(this.strength, target, target > this.strength ? 24 : 16, dt);
-    this.length = T.MathUtils.damp(this.length, T.MathUtils.lerp(3, 9, target), 20, dt);
+    this.length = T.MathUtils.damp(this.length, T.MathUtils.lerp(6, 18, target), 20, dt);
     this.mesh.visible = this.strength > .002 && this.length > .01;
     if (!this.mesh.visible) return;
     if (speed > .1) this.direction.copy(velocity).divideScalar(speed);
