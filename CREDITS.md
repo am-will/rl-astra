@@ -32,4 +32,4 @@ Rocket League, Octane, Champions Field, and associated names belong to their res
 
 ## Sound effects
 
-24 original Ogg files from [ItsBrank/RocketLeague-Audio](https://github.com/ItsBrank/RocketLeague-Audio), pinned to `af49f0471dcf0b5ba02bc6a9c753b81f7d231b82`. See [audio credits](public/audio/rocket-league/CREDITS.md), [per-file provenance and hashes](public/audio/rocket-league/manifest.json), and the [preserved upstream license](public/audio/rocket-league/UPSTREAM-LICENSE). Original Rocket League audio is associated with Psyonix / Epic Games. No music is included.
+23 original Ogg files from [ItsBrank/RocketLeague-Audio](https://github.com/ItsBrank/RocketLeague-Audio), pinned to `af49f0471dcf0b5ba02bc6a9c753b81f7d231b82`. See [audio credits](public/audio/rocket-league/CREDITS.md), [per-file provenance and hashes](public/audio/rocket-league/manifest.json), and the [preserved upstream license](public/audio/rocket-league/UPSTREAM-LICENSE). Original Rocket League audio is associated with Psyonix / Epic Games. No music is included.

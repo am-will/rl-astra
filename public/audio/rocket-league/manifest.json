@@ -124,27 +124,19 @@
     },
     {
       "cue": "demolition",
-      "file": "SFX_VehicleElements_0001.ogg",
-      "source": "Uncategorized/SFX_VehicleElements/SFX_VehicleElements_0001.ogg",
-      "sourceGitBlob": "4359912fcbe3a27c5e1236848f788fef65d7a068",
-      "sha256": "028a3f5e8ae15199efa4a637c35b0bccdfe643820df11f6903871dbb502ea74d",
-      "bytes": 67672
+      "file": "SFX_Impacts_0489.ogg",
+      "source": "Uncategorized/SFX_Impacts/SFX_Impacts_0489.ogg",
+      "sourceGitBlob": "04cb2f722e04836caeb20e3dbc529662046fd3c9",
+      "sha256": "a3666028b735c365ed7d4ff8a14821910a8d5ca9d27c2264fc7b8bc545f37676",
+      "bytes": 105366
     },
     {
-      "cue": "pickupSmall",
+      "cue": "pickup",
       "file": "SFX_UI_Boost_0003.ogg",
       "source": "UserInterface/SFX_UI_Boost/SFX_UI_Boost_0003.ogg",
       "sourceGitBlob": "3ccc35999b829a459a8771b277cecab495f39a2d",
       "sha256": "99af5299a5ff70df2d79129b6066b08b90c5f857aabe5fa9922476a876231edc",
       "bytes": 26208
-    },
-    {
-      "cue": "pickupBig",
-      "file": "SFX_UI_Boost_0007.ogg",
-      "source": "UserInterface/SFX_UI_Boost/SFX_UI_Boost_0007.ogg",
-      "sourceGitBlob": "8b443cded5e65989d972d18be38b6fdf930e7b5a",
-      "sha256": "7a66fa0c08f5af1756bc41f8bad428bb2769808689f6fc51e4ec1edc09eee29c",
-      "bytes": 65101
     },
     {
       "cue": "countdown",

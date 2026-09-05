@@ -60,7 +60,7 @@ export class Game {
       this.view.audio.hit(speed, ...this.soundPosition(position)); this.view.shake = Math.min(.65, speed / 50);
       if (player && speed > 18) this.hud.toast('POWER HIT  +20');
     };
-    this.physics.onPad = big => { this.padCount++; this.hud.boostPickup(big); this.view.audio.pickup(big); if (big) this.hud.toast('BOOST RECHARGED'); };
+    this.physics.onPad = big => { this.padCount++; this.hud.boostPickup(big); this.view.audio.pickup(); if (big) this.hud.toast('BOOST RECHARGED'); };
     this.physics.onFlipReset = () => { this.hud.toast('FLIP RESET  +50'); this.view.audio.flipReset(); };
     this.physics.onJump = (car, dodge) => this.view.audio.jump(dodge, ...this.soundPosition(new Vector3().copy(car.body.translation())));
     this.physics.onLand = (car, speed) => this.view.audio.land(speed, ...this.soundPosition(new Vector3().copy(car.body.translation())));

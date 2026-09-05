@@ -356,9 +356,8 @@ export class Physics {
         car.touchCooldown = .18;
         this.onHit(v3(this.ball.translation()), speed, car === this.player);
       }
-      if (car.demolished <= 0) for (const pad of this.pads) {
-        const p = car.body.translation();
-        if (pad.cooldown <= 0 && p.y < 1.1 && Math.hypot(p.x - pad.x, p.z - pad.z) < (pad.big ? 1.1 : .8) && car.boost < 100) {
+      if (car.demolished <= 0 && car.boost < 100 && car.body.translation().y < 1.1) for (const pad of this.pads) {
+        if (pad.cooldown <= 0 && this.overlapsPad(car, pad) && car.boost < 100) {
           car.boost = Math.min(100, car.boost + (pad.big ? 100 : 12)); pad.cooldown = pad.big ? 10 : 4;
           if (car === this.player) this.onPad(pad.big);
         }
@@ -375,6 +374,17 @@ export class Physics {
     const bv = v3(this.ball.linvel()); if (bv.length() > 60) this.ball.setLinvel(bv.setLength(60), true);
     const angular = v3(this.ball.angvel()); if (angular.length() > 6) this.ball.setAngvel(angular.setLength(6), true);
     for (const pad of this.pads) pad.cooldown = Math.max(0, pad.cooldown - dt);
+  }
+  private overlapsPad(car: Car, pad: Pad) {
+    // Test the whole tire/chassis footprint, so grazing one edge collects.
+    // The extra 20 cm also allows a close pass without requiring precision.
+    const p = car.body.translation(), q = car.body.rotation();
+    const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.x * q.x + q.y * q.y));
+    const cos = Math.cos(yaw), sin = Math.sin(yaw), dx = pad.x - p.x, dz = pad.z - p.z;
+    const side = Math.max(0, Math.abs(dx * cos - dz * sin) - .6);
+    const length = Math.max(0, Math.abs(dx * sin + dz * cos) - .8);
+    const radius = (pad.big ? 1.45 : .97) + .2;
+    return side * side + length * length <= radius * radius;
   }
   goal(): 'blue' | 'orange' | null {
     if (!this.ball.isEnabled()) return null;

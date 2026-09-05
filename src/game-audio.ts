@@ -2,7 +2,7 @@ import { AUDIO_CLIPS, type AudioClip } from './audio-clips';
 import type { Car } from './physics';
 
 interface Loop { source: AudioBufferSourceNode; gain: GainNode; }
-interface Voice { source: AudioBufferSourceNode; gain: GainNode; pan: StereoPannerNode; }
+interface Voice { key: AudioClip; source: AudioBufferSourceNode; gain: GainNode; pan: StereoPannerNode; }
 const clamp = (n: number, min = 0, max = 1) => Math.max(min, Math.min(max, n));
 const LEVEL = .55;
 
@@ -133,7 +133,7 @@ export class GameAudio {
     const targetRevs = running ? this.engineLoad * (car.grounded ? .12 + tireSpeed * .68 : .36) + (1 - this.engineLoad) * tireSpeed * .12 : 0;
     this.engineRevs += (targetRevs - this.engineRevs) * (1 - Math.exp(-dt * 5));
     const revs = this.engineRevs, upper = clamp((revs - .48) / .32);
-    this.ramp(this.engineGain.gain, running ? .42 : 0, .06);
+    this.ramp(this.engineGain.gain, running ? .78 : 0, running ? .06 : .015);
     this.loop('engineIdle', .6 * (1 - clamp(revs * 2.5)), .88 + revs * .3, true);
     this.loop('engineLow', (.16 + this.engineLoad * .18) * Math.sin(clamp(revs / .8) * Math.PI), .75 + revs * .45, true);
     this.loop('engineHigh', .13 * upper * this.engineLoad, .72 + revs * .26, true);
@@ -158,12 +158,15 @@ export class GameAudio {
     if (ctx.currentTime - (this.lastCue.get(group) ?? -Infinity) < cooldown) return;
     this.lastCue.set(group, ctx.currentTime);
     // Physics can report many simultaneous contacts; the mix stays bounded.
-    if (this.voices.size >= 24) this.stopVoice(this.voices.values().next().value!);
+    if (this.voices.size >= 24) this.stopVoice([...this.voices].find(v => v.key !== 'pickup') ?? this.voices.values().next().value!);
     const source = ctx.createBufferSource(), gain = ctx.createGain(), panner = ctx.createStereoPanner();
     source.buffer = buffer; source.playbackRate.value = clamp(rate, .5, 2);
     gain.gain.value = volume; panner.pan.value = clamp(pan, -1, 1);
-    source.connect(gain); gain.connect(panner); panner.connect(this.mix);
-    const voice = { source, gain, pan: panner }; this.voices.add(voice);
+    source.connect(gain); gain.connect(panner);
+    // Keep the pickup's transient and tail intact: world impacts must not
+    // pump this UI cue through the shared compressor. Master mute still applies.
+    panner.connect(key === 'pickup' ? this.master! : this.mix);
+    const voice = { key, source, gain, pan: panner }; this.voices.add(voice);
     source.onended = () => { source.disconnect(); gain.disconnect(); panner.disconnect(); this.voices.delete(voice); };
     source.start();
   }
@@ -172,14 +175,14 @@ export class GameAudio {
     const key = speed < 8 ? 'hitSoft' : this.hitIndex++ % 2 ? 'hitAlt' : 'hitHard';
     this.play(key, (.25 + clamp(speed / 25) * .65) / (1 + distance * .055), .96 + Math.random() * .08, pan, .055, 'hit');
   }
-  pickup(big: boolean) { this.play(big ? 'pickupBig' : 'pickupSmall', big ? .48 : .4, 1, 0, .07, 'pickup'); }
+  pickup() { this.play('pickup', .6, 1, 0, .07); }
   countdown(go: boolean) { this.play(go ? 'go' : 'countdown', go ? .5 : .6, 1, 0, .12); }
   flipReset() { this.play('flipReset', .75, 1, 0, .1); }
   jump(dodge: boolean, distance = 0, pan = 0) {
     this.play(dodge ? 'dodge' : Math.random() < .5 ? 'jump' : 'jumpAlt', .46 / (1 + distance * .08), 1, pan, .06, `jump-${distance < .01 ? 'player' : 'bot'}`);
   }
   land(speed: number, distance = 0, pan = 0) { this.play('land', clamp(speed / 10, .15, .6) / (1 + distance * .07), 1, pan, .13, 'land'); }
-  demolition(distance: number, pan = 0) { this.play('demolition', .7 / (1 + distance * .035), 1, pan, .12); }
+  demolition(distance: number, pan = 0) { this.play('demolition', .55 / (1 + distance * .035), 1, pan, .12); }
   goal() { this.play('goal', .56, 1, 0, .3); this.play('cheer', .23, 1, 0, .3); }
   menu() { this.play('menu', .2, 1, 0, .07); }
 }

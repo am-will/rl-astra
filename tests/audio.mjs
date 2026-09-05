@@ -10,14 +10,14 @@ for (const clip of manifest.clips) {
  assert.equal(createHash('sha256').update(bytes).digest('hex'), clip.sha256);
  assert.equal(createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${bytes.length}\0`),bytes])).digest('hex'),clip.sourceGitBlob);
 }
-check('All 24 local clips match the upstream original bytes', manifest.clips.length === 24, { bytes: manifest.clips.reduce((n,c)=>n+c.bytes,0), commit: manifest.commit });
+check('All local clips match the upstream original bytes', manifest.clips.length === 23, { bytes: manifest.clips.reduce((n,c)=>n+c.bytes,0), commit: manifest.commit });
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
 try {
  const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
  p.on('pageerror', e => errors.push(e.message)); p.on('console', e => { if(e.type()==='error') errors.push(e.text()); });
  await p.goto(process.env.GAME_URL || 'http://127.0.0.1:5179'); await p.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));
  const decoded = await p.evaluate(()=>{const a=window.__game.view.audio;return{context:!!a.ctx,failures:a.failures,clips:[...a.buffers].map(([key,b])=>({key,seconds:b.duration,channels:b.numberOfChannels}))}});
- check('Every original Ogg decodes before play, with no audible context before a gesture', !decoded.context && decoded.failures.length===0 && decoded.clips.length===24 && decoded.clips.every(c=>c.seconds>0), decoded);
+ check('Every original Ogg decodes before play, with no audible context before a gesture', !decoded.context && decoded.failures.length===0 && decoded.clips.length===23 && decoded.clips.every(c=>c.seconds>0), decoded);
  await p.keyboard.press('w'); await p.waitForFunction(()=>window.__game.view.audio.ctx?.state==='running');
  await p.evaluate(()=>{window.requestAnimationFrame=()=>0;});await p.waitForTimeout(80);
  await p.evaluate(()=>{
@@ -29,7 +29,7 @@ try {
   const a=window.__game.view.audio, car={speed:0,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};a.update(car,true,1/60);await new Promise(r=>setTimeout(r,250));const idle=await window.audioEnergy();
   car.speed=20;car.throttle=1;for(let i=0;i<150;i++)a.update(car,true,1/60);await new Promise(r=>setTimeout(r,400));const fast=await window.audioEnergy();const mix=[...a.loops].map(([key,l])=>({key,rate:l.source.playbackRate.value,gain:l.gain.gain.value,buffer:!!l.source.buffer}));return{idle,fast,mix};
  });
- check('Octane buffers produce real output and stay quiet while crossfading from idle to controlled driving revs',engine.idle.rms>.003&&engine.fast.rms>.003&&engine.fast.rms<.02&&engine.mix.every(x=>x.buffer)&&engine.mix.find(x=>x.key==='engineIdle').gain<.01&&engine.mix.find(x=>x.key==='engineHigh').gain>.1&&engine.mix.filter(x=>x.key.startsWith('engine')).every(x=>x.rate<1.15),engine);
+ check('Octane buffers produce audible output while crossfading from idle to controlled driving revs',engine.idle.rms>.003&&engine.fast.rms>.02&&engine.fast.rms<.04&&engine.mix.every(x=>x.buffer)&&engine.mix.find(x=>x.key==='engineIdle').gain<.01&&engine.mix.find(x=>x.key==='engineHigh').gain>.1&&engine.mix.filter(x=>x.key.startsWith('engine')).every(x=>x.rate<1.15),engine);
  const unload=await p.evaluate(async()=>{const a=window.__game.view.audio,c={speed:20,boosting:false,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};for(let i=0;i<120;i++)a.update(c,true,1/60);await new Promise(r=>setTimeout(r,350));const coast={revs:a.engineRevs,load:a.engineLoad,high:a.loops.get('engineHigh').gain.gain.value};c.grounded=false;c.throttle=1;for(let i=0;i<120;i++)a.update(c,true,1/60);return{coast,air:a.engineRevs};});
  check('Releasing throttle at high speed unloads the motor; aerials cannot force a redline',unload.coast.revs<.15&&unload.coast.load<.01&&unload.coast.high<.001&&unload.air<.4,unload);
  const boost=await p.evaluate(async()=>{const a=window.__game.view.audio,c={speed:20,boosting:true,grounded:true,drifting:false,steer:0,demolished:0,throttle:0};a.update(c,true,1/60);const start=[...a.voices].some(v=>v.source.buffer===a.buffers.get('boostStart'));await new Promise(r=>setTimeout(r,2000));const energy=await window.audioEnergy();c.boosting=false;a.update(c,true,1/60);const release=[...a.voices].some(v=>v.source.buffer===a.buffers.get('boostStop'));await new Promise(r=>setTimeout(r,450));return{start,release,energy,loopGain:a.loops.get('boostLoop').gain.gain.value};});
@@ -38,9 +38,38 @@ try {
  check('Tire scrub is audible in a ground drift and silent in the air',tires.ground>.08&&tires.air<.002&&tires.rolling<.002,tires);
  const events=await p.evaluate(async()=>{
   const a=window.__game.view.audio,out=[];a.update({speed:0,boosting:false,grounded:false,drifting:false,steer:0,demolished:0,throttle:0},false,1/60);await new Promise(r=>setTimeout(r,300));
-  for(const [name,fn]of [['hit',()=>a.hit(22)],['small pickup',()=>a.pickup(false)],['big pickup',()=>a.pickup(true)],['jump',()=>a.jump(false)],['dodge',()=>a.jump(true)],['land',()=>a.land(9)],['countdown',()=>a.countdown(false)],['go',()=>a.countdown(true)],['goal',()=>a.goal()],['demolition',()=>a.demolition(0)],['flip reset',()=>a.flipReset()]]){a.reset();await new Promise(r=>setTimeout(r,100));fn();const energy=await window.audioEnergy(250);out.push({name,...energy,voices:a.voices.size});}a.reset();return out;
+  for(const [name,fn]of [['hit',()=>a.hit(22)],['small pickup',()=>window.__game.physics.onPad(false)],['big pickup',()=>window.__game.physics.onPad(true)],['jump',()=>a.jump(false)],['dodge',()=>a.jump(true)],['land',()=>a.land(9)],['countdown',()=>a.countdown(false)],['go',()=>a.countdown(true)],['goal',()=>a.goal()],['demolition',()=>a.demolition(0)],['flip reset',()=>a.flipReset()]]){a.reset();await new Promise(r=>setTimeout(r,100));fn();const energy=await window.audioEnergy(250);out.push({name,...energy,voices:a.voices.size});}a.reset();return out;
  });
  check('Every gameplay cue renders non-silent, unclipped PCM',events.every(e=>e.rms>.0003&&e.peak<.99),events);
+ const pickupMix = await p.evaluate(async () => {
+  const { GameAudio } = await import('/src/game-audio.ts');
+  const nativeContext = window.AudioContext, buffers = window.__game.view.audio.buffers;
+  const render = async (pickup, world) => {
+   const ctx = new OfflineAudioContext(2, 48000 * 2, 48000);
+   // Use the production graph and playback method with an offline clock.
+   Object.defineProperty(ctx, 'state', { get: () => 'running' });
+   window.AudioContext = function () { return ctx; };
+   let audio;
+   try { audio = new GameAudio(); audio.init(); } finally { window.AudioContext = nativeContext; }
+   for (const [key, buffer] of buffers) audio.buffers.set(key, buffer);
+   if (world) { audio.goal(); audio.demolition(0); }
+   if (pickup) audio.pickup();
+   return (await ctx.startRendering()).getChannelData(0);
+  };
+  const solo = await render(true, false), world = await render(false, true), mixed = await render(true, true);
+  let error = 0, peak = 0, energy = 0;
+  for (let i = 0; i < solo.length; i++) { error = Math.max(error, Math.abs(mixed[i] - world[i] - solo[i])); peak = Math.max(peak, Math.abs(mixed[i])); energy += solo[i] * solo[i]; }
+  return { error, peak, rms: Math.sqrt(energy / solo.length) };
+ });
+ check('Loud world effects do not compress or chop the pickup waveform',pickupMix.error<.00001&&pickupMix.peak<.99&&pickupMix.rms>.01,pickupMix);
+ const pickupVoices = await p.evaluate(() => {
+  const a = window.__game.view.audio; a.reset(); a.pickup();
+  const pickup = [...a.voices][0];
+  for (let i = 0; i < 30; i++) a.play('hitSoft', .01);
+  const result = { retained: a.voices.has(pickup), voices: a.voices.size, loop: pickup.source.loop, rate: pickup.source.playbackRate.value };
+  a.reset(); return result;
+ });
+ check('Contact bursts preserve the full pickup voice at its original speed',pickupVoices.retained&&pickupVoices.voices===24&&!pickupVoices.loop&&pickupVoices.rate===1,pickupVoices);
  const positions=await p.evaluate(()=>{const a=window.__game.view.audio;a.reset();a.hit(20,0,-.8);const near=[...a.voices][0],n={gain:near.gain.gain.value,pan:near.pan.pan.value};a.reset();a.hit(20,50,.8);const far=[...a.voices][0];return{near:n,far:{gain:far.gain.gain.value,pan:far.pan.pan.value}};});
  check('Distant world effects attenuate and pan across the stereo field',positions.far.gain<positions.near.gain*.4&&positions.near.pan<-.7&&positions.far.pan>.7,positions);
  const wires=await p.evaluate(()=>{const g=window.__game,a=g.view.audio,seen={},names=['hit','jump','land','pickup','countdown','demolition','goal','flipReset'];const originals={};for(const k of names){originals[k]=a[k];a[k]=(...args)=>{seen[k]=(seen[k]||0)+1;originals[k].apply(a,args)}}
@@ -57,6 +86,6 @@ try {
  await p.evaluate(()=>{window.__game.view.audio.toggle();});await p.reload();await p.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));
  check('Sound preference persists after reload',await p.evaluate(()=>window.__game.view.audio.muted&&document.querySelector('#sound-value').textContent==='OFF'),{});
  const missing=await browser.newPage();await missing.route('**/audio/rocket-league/SFX_Motor_Car01_0005.ogg',route=>route.fulfill({status:404,body:'missing'}));await missing.goto(process.env.GAME_URL||'http://127.0.0.1:5179');await missing.waitForFunction(()=>window.__game&&!document.querySelector('#loading'));const degraded=await missing.evaluate(()=>({failed:window.__game.view.audio.failures.length,loaded:window.__game.view.audio.buffers.size,phase:window.__game.phase}));
- check('A missing clip leaves the game and remaining sounds available',degraded.failed===1&&degraded.loaded===23&&degraded.phase==='ready',degraded);await missing.close();
+ check('A missing clip leaves the game and remaining sounds available',degraded.failed===1&&degraded.loaded===22&&degraded.phase==='ready',degraded);await missing.close();
  check('No browser or audio graph errors',errors.length===0,errors);await writeFile('test-results/audio/checks.json',JSON.stringify({results,errors},null,2));
 } finally { await browser.close(); }
