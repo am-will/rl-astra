@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/original-hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs && node tests/fidelity.mjs && node tests/paint.mjs && node tests/camera-look.mjs && node tests/camera-fade.mjs && node tests/steering-boost.mjs && node tests/arena-polish.mjs && node tests/camera-turf.mjs && node tests/audio.mjs && node tests/ebrake-smoke.mjs && node tests/pad-pickups.mjs",
+    "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/original-hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs && node tests/fidelity.mjs && node tests/paint.mjs && node tests/camera-look.mjs && node tests/camera-fade.mjs && node tests/steering-boost.mjs && node tests/arena-polish.mjs && node tests/camera-turf.mjs && node tests/audio.mjs && node tests/ebrake-smoke.mjs && node tests/pad-pickups.mjs && node tests/ultra-fidelity.mjs && node tests/render-fixes.mjs && node tests/turf-contacts.mjs",
     "test:goals": "node tests/goals.mjs",
     "test:hud": "node tests/hud.mjs",
     "test:original-hud": "node tests/original-hud.mjs",
@@ -30,7 +30,10 @@
     "test:ebrake-smoke": "node tests/ebrake-smoke.mjs",
     "test:pad-pickups": "node tests/pad-pickups.mjs",
     "test:paint": "node tests/paint.mjs",
-    "test:camera-look": "node tests/camera-look.mjs"
+    "test:camera-look": "node tests/camera-look.mjs",
+    "test:ultra-fidelity": "node tests/ultra-fidelity.mjs",
+    "test:render-fixes": "node tests/render-fixes.mjs",
+    "test:turf-contacts": "node tests/turf-contacts.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",

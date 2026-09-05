@@ -54,7 +54,7 @@ export class TireSmoke {
       this.credit--;
       if (this.particles.length >= CAPACITY) this.particles.shift();
       const age = this.credit / rate, position = contacts[this.wheel++ % contacts.length].clone().addScaledVector(velocity, -age);
-      // Ultra grass reaches about .104 m. Start the visible core above it,
+      // Ultra grass stays below .174 m. Start the visible core above it,
       // then lift as the puff expands; retain depth testing against car/arena.
       position.y = Math.max(position.y, .18);
       const drift = velocity.clone().multiplyScalar(.08);

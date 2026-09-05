@@ -79,7 +79,9 @@ export class DemolitionBurst {
     const ink = c.createLinearGradient(0, 85, 0, 290); ink.addColorStop(0, '#fffce8'); ink.addColorStop(.45, '#ffdb80'); ink.addColorStop(1, '#ef7032'); c.fillStyle = ink; c.fillText('BOOM!', 501, 191);
     const texture = new T.CanvasTexture(label); texture.colorSpace = T.SRGBColorSpace;
     this.word = new T.Sprite(new T.SpriteMaterial({ map: texture, depthWrite: false, transparent: true })); this.word.renderOrder = 6; this.root.add(this.word);
-    this.root.add(this.makeSparks(), this.light);
+    this.root.add(this.makeSparks());
+    // Stable light count avoids new shader variants when either/both cars explode.
+    scene.add(this.light);
     const steel = new T.MeshStandardMaterial({ color: 0x333a40, metalness: .8, roughness: .4 });
     const rubber = new T.MeshStandardMaterial({ color: 0x16191c, roughness: .95 });
     const panel = new T.BoxGeometry(1, 1, 1), tire = new T.TorusGeometry(.19, .075, 7, 16);
@@ -111,6 +113,7 @@ export class DemolitionBurst {
   }
   trigger(position: T.Vector3, velocity: T.Vector3, rotation: T.Quaternion, color: T.ColorRepresentation) {
     this.age = 0; this.uniforms.time.value = 0; this.root.position.copy(position); this.root.visible = true;
+    this.light.position.copy(position);
     this.uniforms.drift.value.copy(velocity).multiplyScalar(.22); this.paint.color.set(color);
     this.ring.position.y = .05 - position.y;
     for (const [i, fragment] of this.fragments.entries()) {

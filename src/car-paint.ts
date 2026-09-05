@@ -10,6 +10,7 @@ export const PAINT_JOBS = [
   { id: 'glacier', name: 'Glacier Crest', description: 'Icy metallic blue with black sweeps and twin crests.', color: '#2a9bd5', accent: '#060b15', trim: '#090e17', rim: '#0b1018', metalness: .58, roughness: .25 },
 ] as const;
 export type PaintJob = typeof PAINT_JOBS[number]['id'];
+const ENGINE_COLORS: Record<PaintJob, string> = { classic: '#ff941f', ultraviolet: '#a63dff', crimson: '#ff2438', rally: '#23aaff', midnight: '#668bff', glacier: '#36d9ff' };
 export const validPaintJob = (value: string | null): value is PaintJob => PAINT_JOBS.some(job => job.id === value);
 
 let crestTexture: T.CanvasTexture | undefined;
@@ -96,7 +97,7 @@ export class CarPaint {
   private time = 0;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-  constructor(model: CarModel) {
+  constructor(private model: CarModel) {
     const seen = new Set<T.Material>();
     model.root.traverse(object => {
       if (!(object instanceof T.Mesh)) return;
@@ -127,6 +128,7 @@ export class CarPaint {
 
   set(id: PaintJob) {
     const index = PAINT_JOBS.findIndex(job => job.id === id), job = PAINT_JOBS[index];
+    this.model.lighting?.setColor(ENGINE_COLORS[id]);
     for (const entry of this.entries) {
       const { material, original, role, uniforms } = entry;
       material.color.copy(original.color); material.emissive.copy(original.emissive); material.emissiveIntensity = original.emissiveIntensity;

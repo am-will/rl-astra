@@ -74,7 +74,10 @@ export class GoalExplosion {
     this.shockwave.rotation.x = -Math.PI / 2; this.shockwave.renderOrder = 3; this.root.add(this.shockwave);
     this.tendrils = this.createTendrils(); this.root.add(this.tendrils);
     this.lightning = this.createLightning(); this.root.add(this.lightning);
-    this.root.add(this.createSparks(), this.createDust(), this.light);
+    this.root.add(this.createSparks(), this.createDust());
+    // Keep the light in the scene at zero intensity while idle. Toggling the number
+    // of visible lights recompiles every lit stadium/car material on the first goal.
+    scene.add(this.light);
     window.addEventListener('resize', () => { this.uniforms.screenHeight.value = innerHeight * Math.min(devicePixelRatio, 1.5); });
   }
   createTendrils() {
@@ -154,6 +157,7 @@ export class GoalExplosion {
     this.age = 0; this.uniforms.time.value = 0; this.uniforms.color.value.set(color);
     const side = Math.sign(position.z) || 1;
     this.root.position.set(T.MathUtils.clamp(position.x, -4, 4), 3, side * (FIELD.length - .65));
+    this.light.position.copy(this.root.position);
     this.root.rotation.y = side > 0 ? Math.PI : 0; this.root.visible = true;
     this.shockwave.position.y = -2.945;
     this.light.color.set(color); (this.halo.material as T.SpriteMaterial).color.set(color);

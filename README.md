@@ -16,6 +16,9 @@ npm run build     # Type-check and build production files
 npm run preview   # Serve the production build
 npm test          # Gameplay, arena, aerial control, keyboard/controller, and settings checks
 npm run test:fidelity # Camera preferences, Ultra shaders, boost effects, and responsive settings
+npm run test:ultra-fidelity # Wind motion, paint-colored engine cores, contact shading, and quality switching
+npm run test:render-fixes # First-use explosion shaders, stable lights, and brake lamps
+npm run test:turf-contacts # Four tire patches, silhouette halo regression, and visible turf clumps
 npm run test:controls # Controller mapping, rebinding persistence, ceiling release, and recovery
 npm run test:speed    # Supersonic timing, momentum after ball hits, and wheel trails
 npm run test:hud      # Boost gauge, pickup feedback, scoreboard and compact layouts
@@ -72,9 +75,13 @@ Open **Esc / Options → Camera & visuals** for saved FOV, camera height, distan
 
 With ball cam off, a tiny silver arrow with a round shaft beside the car points toward the ball, including airborne balls. It clears during goals and demolitions. Ball cam displays a red corner indicator with the active keyboard/controller binding. Ramps keep their solid tile faces inside the field and a transparent grid on the outside, so the camera can move through them without shortening its orbit. The scoreboard uses thin arena numerals on inward-tilted team panels, with a flat central clock.
 
-**Performance** is the default and includes the detailed Octane materials, textured field, shadows, and all gameplay effects without bloom. **High** adds bloom and extra pixel density. **Ultra** adds 500,000 instanced grass tufts, warm sunset lighting, richer reflections, 4096px shadows, and up to 2× pixel density. All tiers share the painted team crests, infield lanes, blue/orange ceramic ramp patterns with inlaid borders, and physical car materials. Ultra costs more GPU time; choose Performance for the lightest rendering.
+**Performance** is the default and includes the detailed Octane materials, textured field, shadows, and all gameplay effects without bloom. **High** adds bloom and extra pixel density. **Ultra** adds 1,000,000 slender, curved grass blades across close and distant layers, with varied heights, twisted leaves, sunlit veins, rolling wind gusts and fluttering tips, warm sunset lighting, richer reflections, 4096px shadows, and up to 2× pixel density. Grass compresses at four individual grounded tire contacts, stays clear of boost housings and ramps, and retains the painted field markings. All tiers share the painted team crests, infield lanes, blue/orange ceramic ramp patterns with inlaid borders, and physical car materials. Ultra costs more GPU time; choose Performance for the lightest rendering.
 
-Tire contacts occasionally throw up short-lived pieces of grass and soil, with more during turns and powerslides. These effects leave no persistent tracks and do not spawn in the air, on tiled ramps, or over boost housings.
+Tire contacts occasionally throw up short-lived pieces of grass and soil, with more during turns and powerslides. In Ultra, clumps emerge at the canopy and follow higher arcs, with larger tufts and clearer soil colors so they remain visible above the dense grass. These effects leave no persistent tracks and do not spawn in the air, on tiled ramps, or over boost housings.
+
+Ultra also adds depth-based ambient occlusion, SMAA edge smoothing, a layered sunset sky, and a tighter, texel-aligned sun shadow around the car and ball. The Octane has sculpted tire tread and recessed, segmented rear engine cores that match each paint preset, pulse and brighten with boost. The round red taillights brighten under braking, reverse input, and moving handbrake use, then dim when released. Grass between the tires remains undisturbed. Ambient occlusion applies above the grass canopy; blade root shading and sun shadows shade the turf without a bright fringe following the car.
+
+Goal and demolition graphics are compiled and drawn offscreen before loading finishes. Their lights remain registered at zero intensity while inactive, preventing a scene-wide shader recompile on the first explosion or when both cars are demolished.
 
 The saved **Boost style** selector offers **Classic**, the original focused orange afterburner, and **Inferno**, a multicolored smoke plume with no separate nozzle flame. Inferno particles remain in world space through turns, expire after release, and clear on teleports or style changes. Both styles work in every quality tier.
 

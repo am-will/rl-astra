@@ -91,7 +91,7 @@ export class VisualSettings {
     this.root.querySelector('#quality-description')!.textContent = {
       performance: 'Clean lighting and textured turf. Built for a fast, responsive game.',
       high: 'Sharper rendering with soft bloom around stadium lights and boost.',
-      ultra: 'Dense grass blades, golden-hour light, richer reflections and sharper shadows. Best on a capable GPU.',
+      ultra: 'A million wind-swept grass blades, layered sunset clouds, contact shading, refined edges, detailed shadows and glowing engine cores. Best on a capable GPU.',
     }[this.view.qualityLevel];
   }
   open() { this.visible = true; this.root.hidden = false; this.render(); this.root.querySelector<HTMLSelectElement>('#paint-job')!.focus(); }

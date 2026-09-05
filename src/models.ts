@@ -1,7 +1,9 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { FIELD } from './config';
 import type { CarModel } from './assets';
+import { OctaneLighting } from './octane-lighting';
 
 export async function loadDetailedModels() {
   const loader = new GLTFLoader();
@@ -41,14 +43,24 @@ export function detailedCar(source: T.Group, team: 'blue' | 'orange'): CarModel 
     meshes.forEach(mesh => { mesh.geometry.computeBoundingBox(); wheelBounds.union(mesh.geometry.boundingBox!); });
     const center = wheelBounds.getCenter(new T.Vector3());
     meshes.forEach(mesh => { mesh.geometry.translate(-center.x, -center.y, -center.z); group.add(mesh); });
+    const tire = meshes.find(mesh => (mesh.material as T.Material).name === 'Dieci_Tread');
+    if (tire) {
+      tire.geometry.computeBoundingBox();
+      const size = tire.geometry.boundingBox!.getSize(new T.Vector3()), radius = Math.max(size.y, size.z) * .5;
+      const tread = new T.InstancedMesh(new RoundedBoxGeometry(size.x * .27, .005, radius * .095, 2, .0015), new T.MeshStandardMaterial({ color: 0x15191b, roughness: .94, metalness: .02 }), 144);
+      tread.name = 'octane-sculpted-tread'; tread.castShadow = true; tread.receiveShadow = true;
+      const block = new T.Object3D();
+      for (let row = 0; row < 48; row++) for (let lane = 0; lane < 3; lane++) {
+        const angle = (row + (lane === 1 ? .42 : 0)) / 48 * Math.PI * 2;
+        block.position.set((lane - 1) * size.x * .3, Math.cos(angle) * (radius - .002), Math.sin(angle) * (radius - .002));
+        block.rotation.set(angle, (lane - 1) * .32, 0); block.updateMatrix(); tread.setMatrixAt(row * 3 + lane, block.matrix);
+      }
+      group.add(tread);
+    }
     group.position.copy(center); group.rotation.order = 'YXZ'; group.userData.front = key.startsWith('F'); root.add(group); wheels.push(group);
   }
-  const tail = new T.MeshStandardMaterial({ color: 0x5c0615, emissive: 0xff1433, emissiveIntensity: 1.8, roughness: .2 });
-  for (const side of [-1, 1]) {
-    const light = new T.Mesh(new T.BoxGeometry(.12, .033, .014), tail); light.position.set(side * .37, .07, .704); root.add(light);
-  }
   root.name = `${team}-octane`;
-  return { root, wheels };
+  return { root, wheels, lighting: new OctaneLighting(root, team === 'blue' ? 0xff941f : 0xff6b12) };
 }
 export function detailedBall(source: T.Group) {
   const root = new T.Group(); source.updateMatrixWorld(true);

@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BLUE, ORANGE, FIELD } from './config';
+import { OctaneLighting } from './octane-lighting';
 
 export const material = (color: T.ColorRepresentation, metalness = .2, roughness = .6) => new T.MeshStandardMaterial({ color, metalness, roughness });
 export function box(parent: T.Object3D, size: number[], position: number[], mat: T.Material, rotation?: number[]) {
@@ -36,7 +37,7 @@ function profile(parent: T.Object3D, points: number[][], width: number, mat: T.M
   geometry.rotateY(-Math.PI / 2); geometry.translate(width / 2, 0, 0);
   const mesh = new T.Mesh(geometry, mat); mesh.castShadow = true; parent.add(mesh); return mesh;
 }
-export interface CarModel { root: T.Group; wheels: T.Group[]; }
+export interface CarModel { root: T.Group; wheels: T.Group[]; lighting?: OctaneLighting; }
 export function createCarModel(team: 'blue' | 'orange'): CarModel {
   const root = new T.Group(), body = new T.Group(); root.add(body);
   const color = team === 'blue' ? BLUE : ORANGE;
@@ -100,7 +101,7 @@ export function createCarModel(team: 'blue' | 'orange'): CarModel {
     }
     mergeStatic(wheel);
   }
-  return { root, wheels };
+  return { root, wheels, lighting: new OctaneLighting(root, team === 'blue' ? 0xff941f : 0xff6b12, true, tail) };
 }
 export function createBall() {
   const group = new T.Group(), radius = FIELD.ballRadius;

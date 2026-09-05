@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 await mkdir('test-results/paint', { recursive: true });
-const browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
 const results = [], errors = [];
 const check = (name, pass, detail = {}) => { assert.ok(pass, `${name}: ${JSON.stringify(detail)}`); results.push({ name, detail }); console.log(`PASS ${name}`); };
 try {

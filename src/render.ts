@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createBall, createCarModel, type CarModel } from './assets';
 import { Effects } from './effects';
@@ -20,6 +21,8 @@ import { FlameSmoke } from './flame-smoke';
 import { BallDirection } from './ball-direction';
 import { TurfDebris } from './turf-debris';
 import { CarPaint, validPaintJob, type PaintJob } from './car-paint';
+import { createUltraSky } from './ultra-sky';
+import { UltraOcclusion } from './ultra-occlusion';
 
 export type QualityLevel = 'performance' | 'high' | 'ultra';
 export type BoostStyle = 'classic' | 'inferno';
@@ -30,6 +33,8 @@ export class GameRenderer {
   renderer: T.WebGLRenderer;
   composer: EffectComposer;
   bloom: UnrealBloomPass;
+  occlusion: UltraOcclusion;
+  antialias = new SMAAPass();
   blast = createBlastPass();
   stadium: Stadium;
   player: CarModel; bot: CarModel;
@@ -61,7 +66,11 @@ export class GameRenderer {
   private sun = new T.DirectionalLight();
   private fill = new T.DirectionalLight();
   private ambient = new T.HemisphereLight(0xc5e1ff, 0x233524, 1.25);
-  private sky!: T.Mesh;
+  private sky = createUltraSky();
+  private shadowCenter = new T.Vector3();
+  private shadowRight = new T.Vector3();
+  private shadowUp = new T.Vector3();
+  private sunOffset = new T.Vector3(-50, 42, -35);
   private playerWasDemolished = false;
   constructor(container: HTMLElement, public physics: Physics) {
     try {
@@ -85,15 +94,11 @@ export class GameRenderer {
       panel.position.set(side * 6, 6, -3); panel.lookAt(0, 0, 0); env.add(panel);
     }
     this.scene.environment = pmrem.fromScene(env, .025).texture; pmrem.dispose(); env.dispose(); this.scene.environmentIntensity = .48;
-    this.sky = new T.Mesh(new T.SphereGeometry(240, 40, 24), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false,
-      vertexShader: 'varying vec3 vDirection;void main(){vDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader: `varying vec3 vDirection;void main(){vec3 d=normalize(vDirection);float horizon=exp(-max(d.y,0.)*7.);vec3 color=mix(vec3(.025,.07,.16),vec3(.54,.39,.25),horizon);float sun=pow(max(0.,dot(d,normalize(vec3(-50.,42.,-35.)))),180.);color+=vec3(1.7,.85,.3)*sun;gl_FragColor=vec4(color,1.);#include <tonemapping_fragment>
-#include <colorspace_fragment>}`.replace(';#include',';\n#include') }));
-    this.sky.name = 'ultra-sunset-sky'; this.sky.renderOrder = -5; this.scene.add(this.sky);
+    this.scene.add(this.sky);
     this.scene.add(this.ambient);
     const moon = this.sun; moon.color.setHex(0xe2f2ff); moon.intensity = 2.2; moon.position.set(-25, 65, 22); moon.castShadow = true;
     moon.shadow.mapSize.set(2048, 2048); moon.shadow.camera.left = -65; moon.shadow.camera.right = 65; moon.shadow.camera.top = 65; moon.shadow.camera.bottom = -65; moon.shadow.camera.far = 160; moon.shadow.bias = -.0005; moon.shadow.normalBias = .025;
-    this.scene.add(moon);
+    this.scene.add(moon, moon.target);
     const fill = this.fill; fill.color.setHex(0x90c9ff); fill.intensity = 1.1; fill.position.set(45, 24, -35); this.scene.add(fill);
     this.stadium = new Stadium(this.scene, physics.pads);
     this.player = createCarModel('blue'); this.bot = createCarModel('orange'); this.scene.add(this.player.root, this.bot.root);
@@ -114,9 +119,11 @@ export class GameRenderer {
     this.speedTrails[0].configureWheels(this.player); this.speedTrails[1].configureWheels(this.bot);
     this.turfDebris = [new TurfDebris(this.scene), new TurfDebris(this.scene)];
     this.turfDebris[0].configureWheels(this.player); this.turfDebris[1].configureWheels(this.bot);
-    this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const target = new T.WebGLRenderTarget(innerWidth, innerHeight, { type: T.HalfFloatType, depthTexture: new T.DepthTexture(innerWidth, innerHeight, T.UnsignedIntType) });
+    this.composer = new EffectComposer(this.renderer, target); this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.occlusion = new UltraOcclusion(this.scene, this.camera); this.composer.addPass(this.occlusion);
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
-    this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(new OutputPass());
+    this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(this.antialias); this.composer.addPass(new OutputPass());
     window.addEventListener('resize', () => this.resize());
     this.setQuality(this.qualityLevel);
     this.update(0, 'ready');
@@ -137,17 +144,55 @@ export class GameRenderer {
     old.forEach(root => root.traverse(o => { if (o instanceof T.Mesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } }));
     this.update(0, 'ready');
   }
+  /** Prepare first-use shader programs, textures and buffers while the loading screen is up. */
+  async prepareGraphics() {
+    const passStates = this.composer.passes.map(pass => pass.enabled), toScreen = this.composer.renderToScreen;
+    const grassVisible = this.stadium.grass.mesh.visible, skyVisible = this.sky.visible;
+    const target = this.renderer.getRenderTarget();
+    const culling: [T.Object3D, boolean][] = [];
+    try {
+      this.effects.goal(new T.Vector3(0, 3, FIELD.length), 0x39b7ff);
+      for (const burst of this.effects.demolitions.bursts) burst.trigger(this.player.root.position, new T.Vector3(), new T.Quaternion(), 0xff931f);
+      this.effects.update(.7); // Includes the delayed singularity and every debris/smoke material.
+      for (const root of [this.effects.explosion.root, ...this.effects.demolitions.bursts.map(b => b.root)]) {
+        root.traverse(object => { culling.push([object, object.frustumCulled]); object.frustumCulled = false; });
+      }
+      this.stadium.grass.mesh.visible = this.sky.visible = true;
+      this.composer.passes.forEach(pass => { pass.enabled = true; });
+      this.composer.renderToScreen = false;
+      this.scene.updateMatrixWorld(true);
+      // Compile for the same linear HDR target used during play, including hidden materials.
+      this.renderer.setRenderTarget(this.composer.readBuffer);
+      await this.renderer.compileAsync(this.scene, this.camera);
+      // Drawing offscreen also uploads effect geometry/textures and prepares the blast post pass.
+      this.draw();
+    } finally {
+      this.effects.explosion.reset(); this.effects.demolitions.reset();
+      for (const [object, frustumCulled] of culling) object.frustumCulled = frustumCulled;
+      this.stadium.grass.mesh.visible = grassVisible; this.sky.visible = skyVisible;
+      this.composer.passes.forEach((pass, i) => { pass.enabled = passStates[i]; });
+      this.composer.renderToScreen = toScreen; this.renderer.setRenderTarget(target);
+      this.update(0, 'ready');
+    }
+  }
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight); }
   toggleQuality() { const modes: QualityLevel[] = ['performance', 'high', 'ultra']; this.setQuality(modes[(modes.indexOf(this.qualityLevel) + 1) % modes.length]); }
   setQuality(level: QualityLevel) {
     this.qualityLevel = level;
     const ultra = level === 'ultra', pixelRatio = Math.min(devicePixelRatio, ultra ? 2 : this.quality ? 1.5 : 1);
-    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.bloom.radius = ultra ? .4 : .45; this.bloom.threshold = ultra ? 2.2 : 1.2;
+    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.bloom.radius = ultra ? .5 : .45; this.bloom.threshold = ultra ? 1.65 : 1.2;
+    this.occlusion.enabled = ultra;
+    // Smooth the actual composed image, including fine grass and bright engine cores.
+    this.antialias.enabled = ultra;
     this.stadium.grass.mesh.visible = ultra; this.sky.visible = ultra;
-    this.sun.color.setHex(ultra ? 0xffc786 : 0xe2f2ff); this.sun.intensity = ultra ? 3.1 : 2.2;
+    this.sun.color.setHex(ultra ? 0xffdab0 : 0xe2f2ff); this.sun.intensity = ultra ? 3.3 : 2.2;
     this.sun.position.set(ultra ? -50 : -25, ultra ? 42 : 65, ultra ? -35 : 22);
-    this.fill.intensity = ultra ? 1.2 : 1.1; this.ambient.intensity = ultra ? .8 : 1.25; this.scene.environmentIntensity = ultra ? .58 : .48;
-    (this.scene.fog as T.FogExp2).color.setHex(ultra ? 0x34464d : 0x102139); (this.scene.fog as T.FogExp2).density = ultra ? .0034 : .0045;
+    this.sun.target.position.set(0, 0, 0);
+    const shadowCamera = this.sun.shadow.camera;
+    shadowCamera.left = shadowCamera.bottom = -65; shadowCamera.right = shadowCamera.top = 65; shadowCamera.updateProjectionMatrix();
+    this.sun.shadow.normalBias = ultra ? .012 : .025; this.sun.shadow.bias = ultra ? -.00012 : -.0005;
+    this.fill.intensity = ultra ? .95 : 1.1; this.ambient.intensity = ultra ? .62 : 1.25; this.scene.environmentIntensity = ultra ? .8 : .48;
+    (this.scene.fog as T.FogExp2).color.setHex(ultra ? 0x495969 : 0x102139); (this.scene.fog as T.FogExp2).density = ultra ? .0027 : .0045;
     const size = ultra ? 4096 : 2048;
     if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.sun.shadow.mapSize.set(size, size); }
     this.resize();
@@ -167,6 +212,9 @@ export class GameRenderer {
     for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
     const active = car.boosting && car.demolished <= 0 && (car !== this.physics.bot || this.physics.botEnabled);
     const index = model === this.player ? 0 : 1, velocity = new T.Vector3().copy(car.body.linvel());
+    const signedSpeed = velocity.dot(new T.Vector3(0, 0, -1).applyQuaternion(model.root.quaternion));
+    const braking = (car.drifting && car.speed > .5) || (!active && (car.throttle < -.05 || car.throttle * signedSpeed < -.5));
+    model.lighting?.update(dt, active, braking);
     const classic = this.boostStyle === 'classic';
     this.boosts[index].update(model.root.position, model.root.quaternion, velocity, active && classic, dt);
     this.boosts[index].root.visible &&= classic;
@@ -177,7 +225,8 @@ export class GameRenderer {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
       this.effects.emit(new T.Vector3(Math.random() < .5 ? -.255 : .255, .025, 1.6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
     }
-    this.turfDebris[index].update(model, car, this.physics.pads, dt, model.root.visible && (index === 0 || this.physics.botEnabled));
+    this.turfDebris[index].update(model, car, this.physics.pads, dt, model.root.visible && (index === 0 || this.physics.botEnabled), this.qualityLevel === 'ultra');
+    this.stadium.grass.setTireContacts(index, this.turfDebris[index].contacts, model.root.quaternion);
   }
   update(dt: number, phase: string, celebration?: T.Vector3, alpha = 1) {
     this.time += dt;
@@ -199,7 +248,7 @@ export class GameRenderer {
       (obj as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>).material.opacity = .55 / Math.max(1, owner.position.y * .55);
     }
     this.stadium.update(this.physics.pads, this.time); this.effects.update(dt);
-    this.bloom.strength = (this.qualityLevel === 'ultra' ? .22 : .32) + this.effects.explosion.impact * .35;
+    this.bloom.strength = (this.qualityLevel === 'ultra' ? .28 : .32) + this.effects.explosion.impact * .35;
     this.renderer.toneMappingExposure = (this.qualityLevel === 'ultra' ? 1.08 : 1.05) - this.effects.explosion.impact * .16;
     const car = this.physics.player, pos = this.player.root.position, q = this.player.root.quaternion;
     if (this.playerWasDemolished && car.demolished <= 0) this.cameraReady = false;
@@ -225,12 +274,28 @@ export class GameRenderer {
     this.effects.demolitions.updateCamera(this.camera.position);
     this.stadium.updateCamera(this.camera.position);
     this.stadium.grass.update(this.camera.position, this.player.root.position, this.time);
+    this.sky.material.uniforms.skyTime.value = this.time;
+    if (this.qualityLevel === 'ultra') this.updateSunShadow();
     const blastCenter = this.effects.explosion.root.position.clone().project(this.camera);
     this.blast.enabled = this.effects.explosion.root.visible && blastCenter.z < 1 && Number.isFinite(blastCenter.x) && Number.isFinite(blastCenter.y);
     this.blast.uniforms.center.value.set(blastCenter.x * .5 + .5, blastCenter.y * .5 + .5);
     this.blast.uniforms.time.value = this.effects.explosion.age;
     this.blast.uniforms.aspect.value = this.camera.aspect;
     this.audio.update(car, phase === 'playing' || phase === 'goal' || phase === 'countdown', dt, phase === 'countdown');
+  }
+  private updateSunShadow() {
+    // Keep the car and ball in a tighter, texel-aligned shadow frustum for crisp, stable details.
+    const distance = this.player.root.position.distanceTo(this.ball.position);
+    this.shadowCenter.copy(this.player.root.position);
+    if (distance < 70) this.shadowCenter.lerp(this.ball.position, .5);
+    const radius = Math.ceil(Math.min(55, Math.max(20, distance < 70 ? distance * .5 + 10 : 24)) / 5) * 5;
+    this.shadowRight.crossVectors(T.Object3D.DEFAULT_UP, this.sunOffset).normalize();
+    this.shadowUp.crossVectors(this.sunOffset, this.shadowRight).normalize();
+    const texel = radius * 2 / this.sun.shadow.mapSize.x;
+    for (const axis of [this.shadowRight, this.shadowUp]) { const p = this.shadowCenter.dot(axis); this.shadowCenter.addScaledVector(axis, Math.round(p / texel) * texel - p); }
+    this.sun.target.position.copy(this.shadowCenter); this.sun.position.copy(this.shadowCenter).add(this.sunOffset);
+    const camera = this.sun.shadow.camera;
+    if (camera.right !== radius) { camera.left = camera.bottom = -radius; camera.right = camera.top = radius; camera.updateProjectionMatrix(); }
   }
   draw() { this.renderer.info.reset(); this.composer.render(); }
 }

@@ -10,7 +10,7 @@ interface Clump { life: number; position: T.Vector3; velocity: T.Vector3; rotati
 function clumpGeometry() {
   const soil = new T.IcosahedronGeometry(1, 0); soil.scale(1, .5, .8);
   const positions = Array.from(soil.getAttribute('position').array), colors: number[] = [];
-  const brown = new T.Color(0x42301c), green = new T.Color(0x466027);
+  const brown = new T.Color(0x61452b), green = new T.Color(0x69813a);
   for (let i = 0; i < positions.length; i += 3) colors.push(...(positions[i + 1] > .2 ? green : brown).toArray());
   soil.dispose();
   for (const [x, z, bend] of [[-.35, -.2, .25], [.2, .25, -.4], [.45, -.2, .1]]) {
@@ -34,6 +34,7 @@ function onGrass(point: T.Vector3, pads: Pad[]) {
 export class TurfDebris {
   mesh: T.InstancedMesh;
   smoke: TireSmoke;
+  contacts: T.Vector3[] = [];
   private pool: Clump[] = Array.from({ length: CAPACITY }, () => ({ life: 0, position: new T.Vector3(), velocity: new T.Vector3(), rotation: new T.Vector3(), spin: new T.Vector3(), scale: new T.Vector3() }));
   private wheels: T.Vector3[] = [];
   private previous = new T.Vector3();
@@ -64,19 +65,20 @@ export class TurfDebris {
     this.reset();
   }
 
-  reset() { this.smoke.reset(); for (const p of this.pool) p.life = 0; this.mesh.count = 0; this.credit = 0; this.ready = false; }
+  reset() { this.smoke.reset(); this.contacts = []; for (const p of this.pool) p.life = 0; this.mesh.count = 0; this.credit = 0; this.ready = false; }
 
-  update(model: CarModel, car: Car, pads: Pad[], dt: number, enabled: boolean) {
+  update(model: CarModel, car: Car, pads: Pad[], dt: number, enabled: boolean, ultra = false) {
     const position = model.root.position;
     if (!enabled || (this.ready && this.previous.distanceToSquared(position) > 64)) this.reset();
     if (!enabled) return;
     this.previous.copy(position); this.ready = true;
+    // Refresh even on a paused frame so a reset/teleport cannot leave stale grass compression.
+    const contacts = this.contacts = car.grounded && car.groundNormal.y > .95 ? this.wheels.map(p => p.clone().multiply(model.root.scale).applyQuaternion(model.root.quaternion).add(position)).filter(p => onGrass(p, pads)) : [];
     if (dt <= 0) return;
     const elapsed = Math.min(dt, .05), velocity = new T.Vector3().copy(car.body.linvel());
     const forward = new T.Vector3(0, 0, -1).applyQuaternion(model.root.quaternion), right = new T.Vector3(1, 0, 0).applyQuaternion(model.root.quaternion);
     const slip = Math.min(1, Math.abs(velocity.dot(right)) / 7);
     const disturbance = Math.min(1, Math.abs(car.steer) * .5 + slip * .7 + (car.drifting ? .65 : 0));
-    const contacts = car.grounded && car.groundNormal.y > .95 ? this.wheels.map(p => p.clone().multiply(model.root.scale).applyQuaternion(model.root.quaternion).add(position)).filter(p => onGrass(p, pads)) : [];
     this.smoke.update(contacts.filter(p => p.clone().sub(position).dot(forward) < 0), velocity, car.drifting ? T.MathUtils.smoothstep(car.speed, 2, 9) * (.55 + slip * .45) : 0, elapsed);
     const rate = contacts.length ? T.MathUtils.smoothstep(car.speed, 1, 8) * (5 + disturbance * 48) : 0;
     if (!rate) this.credit = 0;
@@ -86,12 +88,14 @@ export class TurfDebris {
       const contact = contacts[this.wheelCursor++ % contacts.length].clone().addScaledVector(velocity, -this.credit / rate);
       if (!onGrass(contact, pads)) continue;
       const p = this.pool[this.cursor++ % CAPACITY];
-      p.life = .55 + Math.random() * .3; p.position.copy(contact); p.position.y = .055;
+      p.life = .55 + Math.random() * .3; p.position.copy(contact);
+      // Emerge at the canopy, then arc above it; real depth testing still hides clumps behind the car.
+      p.position.y = ultra ? .18 : .055;
       p.velocity.copy(velocity).multiplyScalar(.1).addScaledVector(forward, -(.5 + disturbance * 1.8)).addScaledVector(right, (Math.random() - .5) * (1.2 + disturbance * 2));
-      p.velocity.y = 1 + Math.random() * (1 + disturbance * .9);
+      p.velocity.y = (ultra ? 1.7 + disturbance * .6 : 1) + Math.random() * (1 + disturbance * .9);
       p.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
       p.spin.set((Math.random() - .5) * 12, (Math.random() - .5) * 12, (Math.random() - .5) * 12);
-      const size = .035 + Math.random() * (.025 + disturbance * .035); p.scale.set(size, size * .7, size * 1.2);
+      const size = (.035 + Math.random() * (.025 + disturbance * .035)) * (ultra ? 1.2 : 1); p.scale.set(size, size * .7, size * 1.2);
     }
     let count = 0;
     for (const p of this.pool) {

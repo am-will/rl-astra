@@ -2,7 +2,7 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/fidelity',{recursive:true});
-const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
 const errors=[],results=[];const check=(name,pass,detail)=>{assert.ok(pass,`${name}: ${JSON.stringify(detail)}`);results.push({name,detail});console.log(`PASS ${name}`)};
 try{
  const p=await browser.newPage({viewport:{width:1440,height:900}});p.on('pageerror',e=>errors.push(e.message));p.on('console',e=>{if(e.type()==='error')errors.push(e.text())});

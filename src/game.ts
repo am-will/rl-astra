@@ -28,6 +28,7 @@ export class Game {
       this.view.loadAssets().catch(error => console.warn('Detailed assets unavailable; using the procedural car and ball.', error)),
       this.view.audio.load(),
     ]);
+    await this.view.prepareGraphics();
     this.hud.set('sound-value', this.view.audio.muted ? 'OFF' : 'ON');
     this.hud.onAction = action => this.action(action);
     this.controlsMenu = new ControlsMenu(this.controls, this.hud.root);
