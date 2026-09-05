@@ -72,7 +72,7 @@ Open **Esc / Options → Camera & visuals** for saved FOV, camera height, distan
 
 **Performance** is the default and includes the detailed Octane materials, textured field, shadows, and all gameplay effects without bloom. **High** adds bloom and extra pixel density. **Ultra** adds 500,000 instanced grass tufts, warm sunset lighting, richer reflections, 4096px shadows, and up to 2× pixel density. All tiers share the painted team crests, infield lanes, and physical car materials. Ultra costs more GPU time; choose Performance for the lightest rendering.
 
-The saved **Boost style** selector offers **Classic**, the original focused orange afterburner, and **Inferno**, a hot rolling plume that cools into gray smoke. Inferno particles remain in world space through turns, expire after release, and clear on teleports or style changes. Both styles work in every quality tier.
+The saved **Boost style** selector offers **Classic**, the original focused orange afterburner, and **Inferno**, a multicolored smoke plume with no separate nozzle flame. Inferno particles remain in world space through turns, expire after release, and clear on teleports or style changes. Both styles work in every quality tier.
 
 Press **P** to toggle untimed solo practice, which starts immediately and skips kickoff countdowns. The pause menu includes solo practice, a five-minute match against Maverick, restart, unlimited boost, audio, and performance rendering. Tied matches enter sudden-death overtime. The clock stays at zero while a live ball is airborne.
 

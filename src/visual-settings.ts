@@ -19,7 +19,7 @@ export class VisualSettings {
       <p class="visual-description">Ball cam adjusts your angle to keep the ball in view.</p><button class="visual-reset" id="reset-camera">Reset camera defaults</button>
       <div class="visual-section-title"><h3>LOOK & FEEL</h3></div>
       <label class="visual-select">Visual quality<select id="visual-quality"><option value="performance">Performance</option><option value="high">High</option><option value="ultra">Ultra</option></select></label><p class="visual-description" id="quality-description"></p>
-      <label class="visual-select">Boost style<select id="boost-style"><option value="classic">Classic · orange afterburner</option><option value="inferno">Inferno · flame & smoke</option></select></label><p class="visual-description">Classic's focused jet or Inferno's rolling fire and smoke.</p></div>
+      <label class="visual-select">Boost style<select id="boost-style"><option value="classic">Classic · orange afterburner</option><option value="inferno">Inferno · colored smoke</option></select></label><p class="visual-description">Classic's focused jet or Inferno's multicolored smoke plume.</p></div>
       <footer><span id="visual-save" role="status">SAVED ON THIS BROWSER</span><button id="close-visuals">DONE <span>↗</span></button></footer>
     </section>`;
     parent.append(this.root);

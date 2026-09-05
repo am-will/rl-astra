@@ -134,7 +134,7 @@ export class GameRenderer {
     try { localStorage.setItem('champions-field.quality', level); } catch { /* The selected mode still applies for this session. */ }
   }
   setBoostStyle(style: BoostStyle) {
-    this.boostStyle = style; this.infernos.forEach(effect => effect.reset());
+    this.boostStyle = style; this.boosts.forEach(effect => effect.reset()); this.infernos.forEach(effect => effect.reset());
     try { localStorage.setItem('champions-field.boost-style', style); } catch { /* Apply without persistence. */ }
   }
   syncCar(model: CarModel, car: Car, dt: number, alpha: number) {
@@ -143,14 +143,13 @@ export class GameRenderer {
     for (const wheel of model.wheels) { wheel.rotation.x -= car.speed * dt / .24; if (wheel.userData.front) wheel.rotation.y = car.steer * .4; }
     const active = car.boosting && car.demolished <= 0 && (car !== this.physics.bot || this.physics.botEnabled);
     const index = model === this.player ? 0 : 1, velocity = new T.Vector3().copy(car.body.linvel());
-    // Inferno keeps a short nozzle core beneath the expanding world-space plume.
-    this.boosts[index].lengthScale = this.boostStyle === 'inferno' ? .4 : 1;
-    this.boosts[index].luminosity = this.boostStyle === 'inferno' ? .4 : 1;
-    this.boosts[index].update(model.root.position, model.root.quaternion, velocity, active, dt);
+    const classic = this.boostStyle === 'classic';
+    this.boosts[index].update(model.root.position, model.root.quaternion, velocity, active && classic, dt);
+    this.boosts[index].root.visible &&= classic;
     if (car.demolished > 0 || (index === 1 && !this.physics.botEnabled)) this.infernos[index].reset();
     this.infernos[index].update(model.root.position, model.root.quaternion, velocity, active && this.boostStyle === 'inferno', dt, this.camera);
     this.speedTrails[model === this.player ? 0 : 1].update(model.root.position, model.root.quaternion, car.speed, car.supersonic, model.root.visible && (car !== this.physics.bot || this.physics.botEnabled), dt);
-    if (active && dt > 0 && Math.random() < dt * 35) {
+    if (active && classic && dt > 0 && Math.random() < dt * 35) {
       const behind = new T.Vector3(0, 0, 1).applyQuaternion(model.root.quaternion);
       this.effects.emit(new T.Vector3(Math.random() < .5 ? -.255 : .255, .025, 1.6).applyQuaternion(model.root.quaternion).add(model.root.position), behind.multiplyScalar(6), 0xffa52e, .12 + Math.random() * .15, .06);
     }

@@ -201,7 +201,10 @@ export class Physics {
       const target = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(sideways, normal, heading.clone().negate()));
       q.slerp(target, 1 - Math.exp(-28 * dt));
       body.setRotation(q, true);
-      const turn = input.steer * (.85 + Math.min(Math.abs(signedSpeed) / 3.5, 1) * 1.25) * (signedSpeed < -.25 ? -1 : 1) * (input.drift ? 1.5 : 1);
+      // Steering follows tire travel: zero yaw at rest, gradually increasing
+      // through walking speed, and reversed naturally when rolling backward.
+      const rollingForwardSpeed = velocity.dot(heading);
+      const turn = input.steer * MathUtils.clamp(rollingForwardSpeed / 3.5, -1, 1) * 2.1 * (input.drift ? 1.5 : 1);
       body.setAngvel(normal.clone().multiplyScalar(turn), true);
       const grip = input.drift ? 1.65 : 9.5;
       const normalSpeed = velocity.dot(normal), tangent = velocity.clone().addScaledVector(normal, -normalSpeed), rollingSpeed = tangent.length();
