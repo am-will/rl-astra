@@ -107,7 +107,22 @@ export class DemolitionBurst {
     const mesh = new T.Mesh(geometry, new T.ShaderMaterial({
       uniforms: this.uniforms, transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide,
       vertexShader: `uniform float time;uniform vec3 drift;attribute vec3 velocity;attribute vec3 seed;varying vec2 vUv;varying float alpha;varying float heat;
-        void main(){float t=max(0.,time-seed.x*.12);float travel=(1.-exp(-t*1.7))/1.7;vec3 p=(velocity+drift)*travel+vec3(0,-2.7*t*t,0);p.y=max(-.1,p.y);vec3 v=velocity*exp(-t*1.7)+vec3(0,-5.4*t,0);vec4 eye=modelViewMatrix*vec4(p,1.);vec2 dir=(modelViewMatrix*vec4(v,0.)).xy;dir/=max(.001,length(dir));vec2 side=vec2(-dir.y,dir.x);float length=min(1.5,length(v)*.052);eye.xy+=side*position.x*seed.z+dir*position.y*length;gl_Position=projectionMatrix*eye;vUv=uv;heat=seed.x;alpha=step(.01,t)*(1.-smoothstep(seed.y*.5,seed.y,t))*step(.2,-eye.z);}`,
+        void main(){
+          float t=max(0.,time-seed.x*.12);float travel=(1.-exp(-t*1.7))/1.7;
+          vec3 p=(velocity+drift)*travel+vec3(0,-2.7*t*t,0);
+          vec3 v=(velocity+drift)*exp(-t*1.7)+vec3(0,-5.4*t,0);
+          // Extinguish at the world-space turf, including for airborne demolitions.
+          // Clamping position while gravity kept stretching the streak made ground needles.
+          float airborne=smoothstep(.04,.35,(modelMatrix*vec4(p,1.)).y);
+          float life=1.-smoothstep(seed.y*.5,seed.y,t);
+          vec4 eye=modelViewMatrix*vec4(p,1.);
+          vec2 dir=(modelViewMatrix*vec4(v,0.)).xy;dir/=max(.001,length(dir));
+          vec2 side=vec2(-dir.y,dir.x);
+          float streakLength=mix(seed.z,max(seed.z,min(1.5,length(v)*.052)),airborne*life);
+          eye.xy+=side*position.x*seed.z+dir*position.y*streakLength;
+          gl_Position=projectionMatrix*eye;vUv=uv;heat=seed.x;
+          alpha=step(.01,t)*life*airborne*step(.2,-eye.z);
+        }`,
       fragmentShader: `varying vec2 vUv;varying float alpha;varying float heat;void main(){float edge=max(0.,1.-abs(vUv.x*2.-1.));float a=pow(edge,1.5)*max(0.,sin(vUv.y*3.14159))*alpha;gl_FragColor=vec4(mix(vec3(3.5,.6,.035),vec3(5.,3.5,1.5),heat*heat),a);}`,
     })); mesh.frustumCulled = false; return mesh;
   }
