@@ -42,7 +42,7 @@ try{
  await p.screenshot({path:'test-results/fidelity/settings-mobile.png'});
  await p.evaluate(()=>{localStorage.setItem('champions-field.camera','{"fov":999,"height":null,"distance":-100,"angle":"bad"}');localStorage.setItem('champions-field.quality','invalid');localStorage.setItem('champions-field.boost-style','invalid');});await p.reload();await ready();
  const corrupt=await p.evaluate(()=>({camera:window.__game.view.followCamera.settings,quality:window.__game.view.qualityLevel,style:window.__game.view.boostStyle}));
- check('Invalid saved preferences clamp or fall back safely',corrupt.camera.fov===110&&corrupt.camera.height===2.05&&corrupt.camera.distance===2.8&&corrupt.camera.angle===10&&corrupt.quality==='performance'&&corrupt.style==='classic',corrupt);
+ check('Invalid saved preferences clamp or fall back safely',corrupt.camera.fov===110&&corrupt.camera.height===2.05&&corrupt.camera.distance===2.8&&corrupt.camera.angle===10&&corrupt.quality==='high'&&corrupt.style==='classic',corrupt);
  check('No browser or shader errors',errors.length===0,errors);
  await mkdir('test-results/fidelity',{recursive:true});await writeFile('test-results/fidelity/behavior.json',JSON.stringify({results,errors},null,2));
 }finally{await browser.close()}

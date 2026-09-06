@@ -22,7 +22,7 @@ export class Game {
   async init() {
     await this.physics.init();
     this.view = new GameRenderer(document.querySelector('#app')!, this.physics);
-    this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT');
+    this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'DUSK' : 'NIGHT');
     this.hud.camera(this.view.ballCam);
     await Promise.all([
       this.view.loadAssets().catch(error => console.warn('Detailed assets unavailable; using the procedural car and ball.', error)),
@@ -35,7 +35,7 @@ export class Game {
     this.controlsMenu.onClose = () => this.action('close-bindings');
     this.visualSettings = new VisualSettings(this.view, this.hud);
     this.visualSettings.onClose = () => this.action('close-visuals');
-    this.visualSettings.onChange = () => { this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT'); this.hud.camera(this.view.ballCam); };
+    this.visualSettings.onChange = () => { this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'DUSK' : 'NIGHT'); this.hud.camera(this.view.ballCam); };
     this.controls.onAction = action => this.action(action);
     this.controls.onActivity = () => {
       this.view.audio.init();
@@ -99,7 +99,7 @@ export class Game {
     if (action === 'restart') this.restart();
     if (action === 'reset' && !this.paused && !this.help && !this.controlsMenu.visible) { this.physics.resetCar(this.physics.player); this.view.cameraReady = false; this.hud.toast('CAR RESET'); }
     if (action === 'mode') { this.practice = !this.practice; this.physics.botEnabled = !this.practice; this.hud.set('mode-value', this.practice ? 'SOLO PRACTICE' : '1V1 · MAVERICK'); this.hud.set('match-type', this.practice ? 'SOLO PRACTICE' : 'EXHIBITION · 1V1'); this.hud.mode(!this.practice); this.restart(); }
-    if (action === 'quality') { this.view.toggleQuality(); this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'SUNSET' : 'NIGHT'); }
+    if (action === 'quality') { this.view.toggleQuality(); this.hud.set('quality-value', this.view.qualityLevel.toUpperCase()); this.hud.set('lighting-label', this.view.qualityLevel === 'ultra' ? 'DUSK' : 'NIGHT'); }
     if (action === 'help') { this.help = !this.help; this.hud.el('help-panel').hidden = !this.help; this.controls.clear(); }
     if (action === 'close-help') { this.help = false; this.hud.el('help-panel').hidden = true; this.controls.clear(); }
     if (action === 'bindings') { this.paused = true; this.help = false; this.hud.el('help-panel').hidden = true; this.hud.pause(false); this.controlsMenu.open(); }

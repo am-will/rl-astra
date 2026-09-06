@@ -66,7 +66,8 @@ try{
  const demoReadability=await p.evaluate(async()=>{const T=await import('/node_modules/.vite/deps/three.js'),fx=window.__game.view.effects.demolitions;fx.reset();fx.trigger(new T.Vector3(),new T.Vector3(),new T.Quaternion(),0xff942e);const b=fx.bursts[0];fx.update(.35);fx.updateCamera(new T.Vector3(0,2.6,12));const distant=b.word.material.opacity;fx.update(0);fx.updateCamera(new T.Vector3(0,2.6,2));return{distant,near:b.word.material.opacity};});
  check('Demolition lettering clears the view when driven through',demoReadability.distant>.9&&demoReadability.near<.01,demoReadability);
  const quality=await p.evaluate(()=>{const v=window.__game.view;return{high:v.quality,bloom:v.bloom.enabled,ratio:v.renderer.getPixelRatio(),label:document.querySelector('#quality-value').textContent};});
- check('New browser sessions default to Performance',!quality.high&&!quality.bloom&&quality.ratio===1&&quality.label==='PERFORMANCE',quality);
+ check('New browser sessions default to cinematic High quality',quality.high&&quality.bloom&&quality.ratio===1&&quality.label==='HIGH',quality);
+ await p.evaluate(()=>window.__game.view.setQuality('performance'));
  await p.evaluate(()=>window.__game.action('quality'));await p.reload();await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
  check('High quality preference survives reload',await p.evaluate(()=>window.__game.view.quality&&window.__game.view.bloom.enabled),{});
  await p.evaluate(()=>window.__game.action('quality'));await p.reload();await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));

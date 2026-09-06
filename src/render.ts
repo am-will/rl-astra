@@ -26,6 +26,7 @@ import { TurfDebris } from './turf-debris';
 import { CarPaint, validPaintJob, type PaintJob } from './car-paint';
 import { createUltraSky } from './ultra-sky';
 import { UltraOcclusion } from './ultra-occlusion';
+import { CinematicMotionPass, createCinematicGrade } from './cinematic-pass';
 
 export type QualityLevel = 'performance' | 'high' | 'ultra';
 export type BoostStyle = 'classic' | 'inferno';
@@ -37,6 +38,9 @@ export class GameRenderer {
   composer: EffectComposer;
   bloom: UnrealBloomPass;
   occlusion: UltraOcclusion;
+  motion: CinematicMotionPass;
+  motionBlur = true;
+  grade = createCinematicGrade();
   antialias = new SMAAPass();
   blast = createBlastPass();
   stadium: Stadium;
@@ -66,7 +70,7 @@ export class GameRenderer {
   cameraForward = new T.Vector3(0, 0, -1);
   cameraReady = false;
   followCamera = new FollowCamera();
-  qualityLevel: QualityLevel = 'performance';
+  qualityLevel: QualityLevel = 'high';
   get quality() { return this.qualityLevel !== 'performance'; }
   private sun = new T.DirectionalLight();
   private fill = new T.DirectionalLight();
@@ -80,7 +84,8 @@ export class GameRenderer {
   constructor(container: HTMLElement, public physics: Physics) {
     try {
       const saved = localStorage.getItem('champions-field.quality');
-      if (saved === 'high' || saved === 'ultra') this.qualityLevel = saved;
+      if (saved === 'performance' || saved === 'high' || saved === 'ultra') this.qualityLevel = saved;
+      this.motionBlur = localStorage.getItem('champions-field.motion-blur') !== 'off';
       if (localStorage.getItem('champions-field.boost-style') === 'inferno') this.boostStyle = 'inferno';
       const paint = localStorage.getItem('champions-field.paint-job');
       if (validPaintJob(paint)) this.paintJob = paint;
@@ -128,9 +133,11 @@ export class GameRenderer {
     this.turfDebris[0].configureWheels(this.player); this.turfDebris[1].configureWheels(this.bot);
     const target = new T.WebGLRenderTarget(innerWidth, innerHeight, { type: T.HalfFloatType, depthTexture: new T.DepthTexture(innerWidth, innerHeight, T.UnsignedIntType) });
     this.composer = new EffectComposer(this.renderer, target); this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.motion = new CinematicMotionPass(this.camera); this.composer.addPass(this.motion.depthPass);
     this.occlusion = new UltraOcclusion(this.scene, this.camera); this.composer.addPass(this.occlusion);
+    this.composer.addPass(this.motion);
     this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
-    this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(this.antialias); this.composer.addPass(new OutputPass());
+    this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(this.antialias); this.composer.addPass(this.grade); this.composer.addPass(new OutputPass());
     window.addEventListener('resize', () => this.resize());
     this.setQuality(this.qualityLevel);
     this.update(0, 'ready');
@@ -194,24 +201,29 @@ export class GameRenderer {
   setQuality(level: QualityLevel) {
     this.qualityLevel = level;
     const ultra = level === 'ultra', pixelRatio = Math.min(devicePixelRatio, ultra ? 2 : this.quality ? 1.5 : 1);
-    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.bloom.radius = ultra ? .5 : .45; this.bloom.threshold = ultra ? 1.65 : 1.2;
+    this.renderer.setPixelRatio(pixelRatio); this.composer.setPixelRatio(pixelRatio); this.bloom.enabled = this.quality; this.bloom.radius = ultra ? .62 : .5; this.bloom.threshold = ultra ? 1.35 : 1.25;
+    this.motion.enabled = this.motion.depthPass.enabled = this.quality && this.motionBlur; this.motion.reset();
     this.occlusion.enabled = ultra;
     // Smooth the actual composed image, including fine grass and bright engine cores.
     this.antialias.enabled = ultra;
     this.stadium.grass.mesh.visible = ultra; this.sky.visible = ultra;
     this.stadium.presentation.atmosphere.visible = ultra;
-    this.sun.color.setHex(ultra ? 0xffdab0 : 0xe2f2ff); this.sun.intensity = ultra ? 3.3 : 2.2;
+    this.sun.color.setHex(ultra ? 0xffd4ad : 0xc7dcff); this.sun.intensity = ultra ? 2.15 : 1.9;
     this.sun.position.set(ultra ? -50 : -25, ultra ? 42 : 65, ultra ? -35 : 22);
     this.sun.target.position.set(0, 0, 0);
     const shadowCamera = this.sun.shadow.camera;
     shadowCamera.left = shadowCamera.bottom = -65; shadowCamera.right = shadowCamera.top = 65; shadowCamera.updateProjectionMatrix();
     this.sun.shadow.normalBias = ultra ? .012 : .025; this.sun.shadow.bias = ultra ? -.00012 : -.0005;
-    this.fill.intensity = ultra ? .95 : 1.1; this.ambient.intensity = ultra ? .62 : 1.25; this.scene.environmentIntensity = ultra ? .8 : .48;
-    (this.scene.fog as T.FogExp2).color.setHex(ultra ? 0x495969 : 0x102139); (this.scene.fog as T.FogExp2).density = ultra ? .0027 : .0045;
+    this.fill.intensity = ultra ? .65 : .75; this.ambient.intensity = ultra ? .46 : .8; this.scene.environmentIntensity = ultra ? .6 : .46;
+    (this.scene.fog as T.FogExp2).color.setHex(ultra ? 0x17293e : 0x102139); (this.scene.fog as T.FogExp2).density = ultra ? .0038 : .0045;
     const size = ultra ? 4096 : 2048;
     if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.sun.shadow.mapSize.set(size, size); }
     this.resize();
     try { localStorage.setItem('champions-field.quality', level); } catch { /* The selected mode still applies for this session. */ }
+  }
+  setMotionBlur(enabled: boolean) {
+    this.motionBlur = enabled; this.motion.enabled = this.motion.depthPass.enabled = enabled && this.quality; this.motion.reset();
+    try { localStorage.setItem('champions-field.motion-blur', enabled ? 'on' : 'off'); } catch { /* Apply without persistence. */ }
   }
   setBoostStyle(style: BoostStyle) {
     this.boostStyle = style; this.boosts.forEach(effect => effect.reset()); this.infernos.forEach(effect => effect.reset());
@@ -266,11 +278,12 @@ export class GameRenderer {
       (obj as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>).material.opacity = .55 / Math.max(1, owner.position.y * .55);
     }
     this.stadium.update(this.physics.pads, this.time); this.effects.update(dt);
-    this.bloom.strength = (this.qualityLevel === 'ultra' ? .28 : .32) + this.effects.explosion.impact * .35;
-    this.renderer.toneMappingExposure = (this.qualityLevel === 'ultra' ? 1.08 : 1.05) - this.effects.explosion.impact * .16;
+    this.bloom.strength = (this.qualityLevel === 'ultra' ? .44 : .36) + this.effects.explosion.impact * .3;
+    this.renderer.toneMappingExposure = .97 - this.effects.explosion.impact * .12;
     const car = this.physics.player, pos = this.player.root.position, q = this.player.root.quaternion;
     if (this.playerWasDemolished && car.demolished <= 0) this.cameraReady = false;
     this.playerWasDemolished = car.demolished > 0;
+    const cameraCut = !this.cameraReady;
     const focus = phase === 'goal' && celebration ? this.effects.explosion.root.position : this.ball.position;
     this.followCamera.update(this.camera, pos, q, focus, car.demolished > 0 ? 0 : car.speed, this.ballCam, car.flipTime > 0, dt, !this.cameraReady, (from, to) => this.physics.cameraClearance(from, to), this.cameraLook);
     if (dt > 0 || !this.cameraReady) { this.cameraForward.copy(this.followCamera.forward); this.look.copy(this.followCamera.look); }
@@ -289,6 +302,7 @@ export class GameRenderer {
       this.camera.lookAt(target);
     }
     this.camera.updateMatrixWorld();
+    this.motion.update(dt, car.speed, this.motionBlur && this.quality && !this.paintPreview && (phase === 'playing' || phase === 'goal'), cameraCut, pos, this.ball.position);
     this.supersonicStreaks.update(this.camera, pos, new T.Vector3().copy(car.body.linvel()), car.supersonic,
       this.player.root.visible && !this.paintPreview && (phase === 'playing' || phase === 'goal'), dt);
     this.effects.demolitions.updateCamera(this.camera.position);

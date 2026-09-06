@@ -1,6 +1,6 @@
 import * as T from 'three';
 
-/** HDR sunset with layered clouds and warm scattering along the horizon. */
+/** Deep dusk with layered clouds and a narrow warm horizon below the cool sky. */
 export function createUltraSky() {
   const material = new T.ShaderMaterial({ side: T.BackSide, depthWrite: false,
     uniforms: { skyTime: { value: 0 } },
@@ -12,14 +12,14 @@ export function createUltraSky() {
       void main(){
         vec3 d=normalize(skyDirection),sunDirection=normalize(vec3(-50.,42.,-35.));
         float h=max(d.y,0.),alignment=max(dot(d,sunDirection),0.);
-        vec3 sky=mix(vec3(.48,.26,.13),vec3(.035,.13,.3),smoothstep(0.,.6,h));
-        sky+=vec3(1.,.48,.15)*pow(alignment,8.)*.23;
-        sky+=vec3(5.,3.8,2.3)*smoothstep(.9992,.9997,alignment);
+        vec3 sky=mix(vec3(.19,.085,.055),vec3(.009,.025,.075),smoothstep(0.,.5,h));
+        sky+=vec3(1.,.38,.12)*pow(alignment,12.)*.07;
+        sky+=vec3(2.5,1.65,.85)*smoothstep(.9992,.9997,alignment);
         vec2 p=d.xz/(h+.28)*2.6+vec2(skyTime*.012,skyTime*.0045);
         float density=clouds(p),coverage=smoothstep(.43,.65,density)*smoothstep(.015,.16,h);
         float rim=clamp((density-clouds(p+sunDirection.xz*.13))*8.+.5,0.,1.);
-        vec3 cloudColor=mix(vec3(.11,.16,.23),vec3(.72,.55,.39),rim);
-        cloudColor+=vec3(.8,.36,.1)*pow(alignment,5.)*rim;
+        vec3 cloudColor=mix(vec3(.023,.037,.068),vec3(.19,.145,.16),rim);
+        cloudColor+=vec3(.27,.10,.035)*pow(alignment,8.)*rim;
         sky=mix(sky,cloudColor,coverage*.82);
         gl_FragColor=vec4(sky,1.);
         #include <tonemapping_fragment>

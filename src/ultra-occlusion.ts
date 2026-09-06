@@ -5,7 +5,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 export class UltraOcclusion extends GTAOPass {
   constructor(scene: T.Scene, camera: T.Camera) {
     super(scene, camera);
-    this.blendIntensity = .65;
+    this.blendIntensity = .72;
     this.updateGtaoMaterial({ radius: .48, thickness: .7, distanceFallOff: 1., samples: 16, scale: 1. });
     this.updatePdMaterial({ radius: 5, samples: 16, depthPhi: 2., normalPhi: 4. });
     // Reconstructed screen-space horizons lose the hidden grass behind a foreground car,

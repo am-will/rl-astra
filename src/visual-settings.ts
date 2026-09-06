@@ -26,6 +26,7 @@ export class VisualSettings {
       <div class="visual-section-title"><h3>LOOK & FEEL</h3></div>
       <label class="visual-select">On-screen text<select id="text-style"><option value="original">Original</option><option value="cartoon">Cartoon</option></select></label><p class="visual-description">Original's thin gold lettering and goal award, or Cartoon's bold comic announcements.</p>
       <label class="visual-select">Visual quality<select id="visual-quality"><option value="performance">Performance</option><option value="high">High</option><option value="ultra">Ultra</option></select></label><p class="visual-description" id="quality-description"></p>
+      <label class="visual-select">Motion blur<select id="motion-blur"><option value="on">Cinematic</option><option value="off">Off</option></select></label><p class="visual-description">Smooth camera motion with a sharper car and ball. Active in High and Ultra; pauses with the game.</p>
       <label class="visual-select">Boost style<select id="boost-style"><option value="classic">Classic · orange afterburner</option><option value="inferno">Inferno · colored smoke</option></select></label><p class="visual-description">Classic's focused jet or Inferno's multicolored smoke plume.</p></div>
       <footer><span id="visual-save" role="status">SAVED ON THIS BROWSER</span><button id="close-visuals">DONE <span>↗</span></button></footer>
     </section>`;
@@ -48,6 +49,9 @@ export class VisualSettings {
     });
     this.root.querySelector('#boost-style')!.addEventListener('change', event => {
       view.setBoostStyle((event.target as HTMLSelectElement).value as BoostStyle); this.render();
+    });
+    this.root.querySelector('#motion-blur')!.addEventListener('change', event => {
+      view.setMotionBlur((event.target as HTMLSelectElement).value === 'on'); this.render();
     });
     this.root.querySelector('#text-style')!.addEventListener('change', event => {
       const saved = hud.setTextStyle((event.target as HTMLSelectElement).value as TextStyle);
@@ -78,6 +82,7 @@ export class VisualSettings {
       this.root.querySelector(`#camera-${key}-value`)!.textContent = key === 'fov' || key === 'angle' ? `${value}°` : value.toFixed(2);
     }
     this.root.querySelector<HTMLSelectElement>('#visual-quality')!.value = this.view.qualityLevel;
+    this.root.querySelector<HTMLSelectElement>('#motion-blur')!.value = this.view.motionBlur ? 'on' : 'off';
     this.root.querySelector<HTMLSelectElement>('#boost-style')!.value = this.view.boostStyle;
     this.root.querySelector<HTMLSelectElement>('#text-style')!.value = this.hud.textStyle;
     this.root.querySelector<HTMLSelectElement>('#paint-job')!.value = this.view.paintJob;
@@ -89,9 +94,9 @@ export class VisualSettings {
     this.root.querySelectorAll<HTMLButtonElement>('[data-paint]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.paint === this.view.paintJob)));
     this.root.querySelector('#preview-camera')!.textContent = this.view.ballCam ? 'PREVIEW CAR CAM' : 'PREVIEW BALL CAM';
     this.root.querySelector('#quality-description')!.textContent = {
-      performance: 'Clean lighting and textured turf. Built for a fast, responsive game.',
-      high: 'Sharper rendering with soft bloom around stadium lights and boost.',
-      ultra: 'Wind-swept grass, moving sunset clouds, roof searchlights, crowd lights, detailed shadows and glowing engine cores. Live stadium screens and animated banners in every mode.',
+      performance: 'Rich night lighting, cinematic color and textured turf. Built for a fast, responsive game.',
+      high: 'Cinematic night lighting, smooth motion and soft bloom around stadium lights and boost.',
+      ultra: 'Deep dusk skies, wind-swept grass, contact shading, detailed shadows and cinematic motion. Stadium lights and glowing engine cores stand out against the darker field.',
     }[this.view.qualityLevel];
   }
   open() { this.visible = true; this.root.hidden = false; this.render(); this.root.querySelector<HTMLSelectElement>('#paint-job')!.focus(); }
