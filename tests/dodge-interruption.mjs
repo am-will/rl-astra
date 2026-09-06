@@ -96,12 +96,12 @@ try {
       return { uninterrupted, pulses, held, ground, gamepad, keyboard };
     } finally { physics.world.free(); }
   });
-  // The 650 ms interval is powered torque, not an animation that finishes a
-  // whole turn. The car retains spin and follows through under air damping.
-  check('All eight dodges rotate through inversion and retain follow-through at torque cutoff', data.uninterrupted.every(r => r.middleUp < -.99 && r.endError > .6 && r.endError < .95 && r.recoveryError > .75 && r.recoveryError < 1.05 && Math.abs(r.angularSpeed - 6.325) < .001), data.uninterrupted);
-  check('Brief counter-pitch cannot abort a tackle or cause a pose jump', data.pulses.every(r => r.activeAfterPulse && r.finished && Math.abs(r.endUp - data.uninterrupted.find(b => b.forward === r.forward && b.side === r.side).endUp) < .04 && r.maxStep < .075), data.pulses);
+  // Torque ends at 500 ms. By 650 ms the car is upright with residual
+  // angular motion, which recovery damping settles without forcing its pose.
+  check('All eight dodges rotate through inversion and settle upright promptly', data.uninterrupted.every(r => r.middleUp < -.99 && r.endUp > .96 && r.endError < .3 && r.recoveryError > .08 && r.recoveryError < .25 && r.angularSpeed > 1 && r.angularSpeed < 2.1), data.uninterrupted);
+  check('Brief counter-pitch cannot abort a tackle or cause a pose jump', data.pulses.every(r => r.activeAfterPulse && r.finished && Math.abs(r.endUp - data.uninterrupted.find(b => b.forward === r.forward && b.side === r.side).endUp) < .04 && r.maxStep < .1), data.pulses);
   check('Held counter-pitch damps existing pitch while diagonal roll continues', data.held.every(r => r.active && r.pitchSpeedAfter > 0 && r.pitchSpeedAfter < r.pitchSpeedBefore * .85 && r.pitchChange > .01 && r.yawChange < .02 && (r.side === 0 ? r.rollChange < .001 : r.rollChange > .1)), data.held);
-  check('Releasing counter-pitch resumes rotation without snapping', data.held.every(r => r.resumedAngle > .18 && r.resumedAngle < .24), data.held);
+  check('Releasing counter-pitch resumes rotation without snapping', data.held.every(r => r.resumedAngle > .23 && r.resumedAngle < .32), data.held);
   check('Early and late ground tackles land on their wheels at every tested speed', data.ground.every(r => r.started && !r.abortedInverted && r.grounded && r.up > .99), data.ground);
   check('A transient controller stick reversal does not kill the tackle', data.gamepad.launch && data.gamepad.pulsePitch > .3 && data.gamepad.activeAfterPulse && Math.abs(data.gamepad.endUp - data.uninterrupted[0].endUp) < .03, data.gamepad);
   check('A brief keyboard direction reversal preserves the dodge trajectory', data.keyboard.finished && Math.abs(data.keyboard.endUp - data.uninterrupted[0].endUp) < .03, data.keyboard);

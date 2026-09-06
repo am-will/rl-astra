@@ -16,7 +16,7 @@ try{
    c.body.setLinvel(right.multiplyScalar(side*speed),true);
    let earlySpeed=0,distance=0,grounded=true,finalSpeed=speed;
    for(let i=0;i<5/STEP;i++){
-    g.physics.step({...emptyInput(),drift},emptyInput());
+    g.physics.step({...emptyInput(),drift:drift&&i<120},emptyInput());
     const v=c.body.linvel(),current=Math.hypot(v.x,v.z);
     if(i===59)earlySpeed=current;
     finalSpeed=current;grounded&&=c.grounded;
@@ -26,9 +26,11 @@ try{
   }
   return rows;
  });
- check('Broadside slides lose speed promptly with and without the e-brake',slides.every(r=>r.earlySpeed<r.speed*(r.drift?.6:.05)),slides);
- check('Sideways slides settle on the tires before reaching a wall',slides.every(r=>r.finalSpeed<.1&&r.distance<18&&r.grounded),slides);
- check('Holding the e-brake allows a longer slide while still slowing down',slides.filter(r=>r.drift).every(r=>r.distance>slides.find(p=>!p.drift&&p.yaw===r.yaw&&p.side===r.side&&p.speed===r.speed).distance*2),slides);
+ // RocketSim reduces lateral grip at full slip and blends handbrake release
+ // over half a second. Check the slide and release, not an instant grip snap.
+ check('Broadside slides dissipate speed, with lower grip while powersliding',slides.every(r=>r.earlySpeed<r.speed*(r.drift?.72:.27)),slides);
+ check('Sideways slides settle on their tires after releasing powerslide',slides.every(r=>r.finalSpeed<.1&&r.distance<27&&r.grounded),slides);
+ check('A one-second powerslide travels farther while still slowing down',slides.filter(r=>r.drift).every(r=>r.distance>slides.find(p=>!p.drift&&p.yaw===r.yaw&&p.side===r.side&&p.speed===r.speed).distance*2),slides);
  const release=await page.evaluate(async()=>{
   const g=window.__game,{emptyInput}=await import('/src/config.ts');
   g.scenario('drive');g.physics.ball.setEnabled(false);g.physics.resetCar(g.physics.player,0,0);
@@ -36,7 +38,7 @@ try{
   const c=g.physics.player;c.body.setLinvel({x:18,y:0,z:0},true);
   for(let i=0;i<60;i++)g.physics.step({...emptyInput(),drift:true},emptyInput());
   const before=Math.abs(c.body.linvel().x);
-  for(let i=0;i<60;i++)g.physics.step(emptyInput(),emptyInput());
+  for(let i=0;i<180;i++)g.physics.step(emptyInput(),emptyInput());
   return{before,after:Math.abs(c.body.linvel().x)};
  });
  check('Releasing the e-brake restores grip during an ongoing slide',release.before>3&&release.after<release.before*.05,release);
@@ -51,7 +53,7 @@ try{
    for(let i=0;i<90;i++)g.physics.step({...emptyInput(),throttle:1,steer,drift:driftTurn},emptyInput());
    const c=g.physics.player,initialSpeed=c.speed;let maxSideways=0,grounded=true,clearOfWalls=true;
    for(let i=0;i<720;i++){
-    g.physics.step({...emptyInput(),steer,drift:driftCoast},emptyInput());
+    g.physics.step({...emptyInput(),steer,drift:driftCoast&&i<120},emptyInput());
     const v=new Vector3().copy(c.body.linvel()),p=c.body.translation(),right=new Vector3(1,0,0).applyQuaternion(c.body.rotation());
     if(v.length()>1)maxSideways=Math.max(maxSideways,Math.abs(v.dot(right))/v.length());
     grounded&&=c.grounded;clearOfWalls&&=Math.abs(p.x)<30&&Math.abs(p.z)<40;
@@ -60,7 +62,7 @@ try{
   }
   return rows;
  });
- check('Accelerate, turn and release throttle settles even while steering is held',turning.every(r=>r.initialSpeed>10&&r.finalSpeed<.05&&r.grounded&&r.clearOfWalls),turning);
+ check('Accelerate, turn and release throttle/powerslide settles with steering held',turning.every(r=>r.initialSpeed>10&&r.finalSpeed<.05&&r.grounded&&r.clearOfWalls),turning);
  check('Driving reproduction reaches a broadside slide in both directions',turning.filter(r=>r.driftTurn||r.driftCoast).every(r=>r.maxSideways>.95),turning);
  const ramps=await page.evaluate(async()=>{
   const g=window.__game,{emptyInput}=await import('/src/config.ts'),rows=[];
@@ -82,7 +84,9 @@ try{
    rows.push({yaw,drift,min,grounded});
   }return rows;
  });
- check('Straight and angled landings retain rolling momentum',landings.every(r=>r.grounded&&r.min>17),landings);
+ // Tire grip removes lateral impact velocity; it must not refund that loss
+ // as extra forward speed. Preserve the rolling component of the approach.
+ check('Landings preserve forward momentum while grip sheds sideways motion',landings.every(r=>r.grounded&&r.min>18*Math.cos(r.yaw)*.94),landings);
  check('Powerslide keeps more momentum in an angled landing',landings.filter(r=>r.drift&&r.yaw>0).every(r=>r.min>landings.find(p=>!p.drift&&p.yaw===r.yaw).min),landings);
  const collision=await page.evaluate(async()=>{
   const g=window.__game,{emptyInput,FIELD}=await import('/src/config.ts');g.scenario('drive');g.physics.ball.setEnabled(false);g.physics.resetCar(g.physics.player,38,5,-Math.PI/2);const c=g.physics.player;c.body.setTranslation({x:38,y:6,z:5},true);c.body.setLinvel({x:18,y:0,z:0},true);

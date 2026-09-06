@@ -1,7 +1,8 @@
 import * as T from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import type { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { createBloomPass } from './bloom-pass';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -136,7 +137,7 @@ export class GameRenderer {
     this.motion = new CinematicMotionPass(this.camera); this.composer.addPass(this.motion.depthPass);
     this.occlusion = new UltraOcclusion(this.scene, this.camera); this.composer.addPass(this.occlusion);
     this.composer.addPass(this.motion);
-    this.bloom = new UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .32, .45, 1.2); this.bloom.enabled = this.quality;
+    this.bloom = createBloomPass(new T.Vector2(innerWidth, innerHeight)); this.bloom.enabled = this.quality;
     this.composer.addPass(this.bloom); this.composer.addPass(this.blast); this.composer.addPass(this.antialias); this.composer.addPass(this.grade); this.composer.addPass(new OutputPass());
     window.addEventListener('resize', () => this.resize());
     this.setQuality(this.qualityLevel);

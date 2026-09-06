@@ -10,8 +10,8 @@ try {
   await page.goto('http://127.0.0.1:5179');await page.waitForFunction(()=>window.__game?.view && !document.querySelector('#loading'));
   for(const [name,input] of [['forward',{throttle:1,pitch:-1}],['backward',{throttle:-1,pitch:1}],['side',{steer:1}],['diagonal',{throttle:1,steer:-1,pitch:-1}]]){
     const data=await page.evaluate(input=>{const g=window.__game;g.scenario('air');g.advance(.325,{...input,jump:true});const middle=g.snapshot().rotation;g.advance(.325,input);const end=g.snapshot().rotation;const angular=g.physics.player.body.angvel();g.advance(.2,{throttle:input.throttle||0,pitch:input.pitch||0});return{middle,end,angular,recovery:g.snapshot().rotation};},input);
-    check(`${name} dodge retains spin at the end of its powered phase`,Math.abs(data.end.w)>.85 && Math.abs(data.end.w)<.98 && Math.abs(Math.hypot(data.angular.x,data.angular.y,data.angular.z)-6.325)<.001 && Math.abs(data.middle.w)<.35,data);
-    check(`${name} dodge follows through near upright`,Math.abs(data.recovery.w)>.99,data.recovery);
+    check(`${name} dodge is upright and settling within 650 ms`,1-2*(data.end.x**2+data.end.z**2)>.96 && Math.hypot(data.angular.x,data.angular.y,data.angular.z)>1 && Math.hypot(data.angular.x,data.angular.y,data.angular.z)<2.5 && Math.abs(data.middle.w)<.35,data);
+    check(`${name} dodge follows through near upright`,1-2*(data.recovery.x**2+data.recovery.z**2)>.99,data.recovery);
   }
   const roll=await page.evaluate(()=>{const g=window.__game;g.scenario('air');g.advance(.35,{roll:1});const speed=g.physics.player.body.angvel();const initial=g.view.player.root.quaternion.clone();g.advance(2*Math.PI/5.5,{roll:1});const current=g.view.player.root.quaternion;return{speed,turnError:initial.angleTo(current)};});
   check('Air roll reaches RL angular limit',Math.abs(Math.abs(roll.speed.z)-5.5)<.01,roll);
@@ -27,8 +27,8 @@ try {
     check(`Wall-to-ceiling transition ${side}`,ride.max>19 && ride.upsideDown && !ride.escaped,ride);
   }
   for(const end of [-1,1])for(const side of [-1,1]){
-    const entrance=await page.evaluate(({end,side})=>{const g=window.__game;g.scenario('drive');g.physics.resetCar(g.physics.player,side*6,end*50.25,side*-Math.PI/2);g.physics.player.body.setLinvel({x:side*7,y:0,z:0},true);const trace=[];let minSpeed=100,maxHeight=0;for(let i=0;i<60;i++){g.advance(1/60,{throttle:1});const s=g.snapshot();minSpeed=Math.min(minSpeed,Math.abs(s.velocity.x));maxHeight=Math.max(maxHeight,s.car.y);if(i%15===0)trace.push({pos:s.car,speed:s.velocity});}return{minSpeed,maxHeight,trace};},{end,side});
-    check(`Goal-mouth ramp has no exposed side (${end}, ${side})`,entrance.minSpeed>4 && entrance.maxHeight<3,entrance);
+    const entrance=await page.evaluate(({end,side})=>{const g=window.__game;g.scenario('drive');g.physics.resetCar(g.physics.player,side*6,end*50.25,side*-Math.PI/2);g.physics.player.body.setLinvel({x:side*7,y:0,z:0},true);const trace=[];let minSpeed=100,maxHeight=0;for(let i=0;i<60;i++){g.advance(1/60,{throttle:1});const s=g.snapshot();minSpeed=Math.min(minSpeed,Math.abs(s.velocity.x));maxHeight=Math.max(maxHeight,s.car.y);if(i%15===0)trace.push({pos:s.car,speed:s.velocity});}return{minSpeed,maxHeight,trace,final:g.snapshot()};},{end,side});
+    check(`Goal-mouth ramp remains traversable with tire and chassis friction (${end}, ${side})`,entrance.minSpeed>1.25 && entrance.maxHeight<3 && Math.abs(entrance.final.car.x)>10 && Math.abs(entrance.final.velocity.x)>5,entrance);
   }
   for(const end of [-1,1]){
     const goal=await page.evaluate(end=>{const g=window.__game;g.scenario('drive');g.physics.resetCar(g.physics.player,6,end*53,0);g.physics.player.body.setTranslation({x:6,y:1,z:end*53},true);g.physics.ball.setTranslation({x:0,y:3,z:end*58},true);g.physics.ball.setLinvel({x:0,y:0,z:end*10},true);for(let i=0;i<80;i++)g.physics.step({throttle:0,steer:0,pitch:0,roll:0,jump:false,jumpHeld:false,boost:false,drift:false},{throttle:0,steer:0,pitch:0,roll:0,jump:false,jumpHeld:false,boost:false,drift:false});return{ball:g.snapshot().ball,velocity:g.snapshot().ballVelocity};},end);

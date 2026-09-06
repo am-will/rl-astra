@@ -1,5 +1,5 @@
 /* The score wings recede at their outside edges; the central clock stays flat. */
-.scoreboard{position:absolute;top:0;z-index:2;left:50%;transform:translateX(-50%);width:284px;font-variant-numeric:tabular-nums}
+.scoreboard{position:absolute;top:0;z-index:2;left:50%;transform:translateX(-50%) scale(1.5);transform-origin:center top;width:284px;font-variant-numeric:tabular-nums}
 .scoreboard-main{display:grid;grid-template-columns:72px 140px 72px;align-items:stretch;height:58px;gap:0}
 .team{position:relative;overflow:visible;display:flex;align-items:center;justify-content:center;isolation:isolate;border:1px solid transparent;color:#fff;backface-visibility:hidden}
 .team-blue{--team-top:#477effe3;--team-bottom:#365dddce;--team-glow:#528aff80;transform-origin:right center;transform:perspective(125px) rotateY(-24deg)}
@@ -60,6 +60,7 @@
 @media(max-width:390px){.scoreboard{width:210px}.scoreboard-main{grid-template-columns:56px 98px 56px}.boost-hud{width:134px;right:5px}.boost-value strong{font-size:31px}}
 @media(max-width:650px){.bottom-left{bottom:78px}}
 @media(max-width:430px){.top-actions [data-action="fullscreen"]{display:none}}
+@media(max-width:500px){.identity,.top-actions{top:88px}}
 @media(max-height:600px) and (min-width:651px){.scoreboard-main{height:47px}.team strong{font-size:30px}.clock>strong{font-size:21px}.boost-hud{width:153px;bottom:22px;right:16px}.boost-value strong{font-size:35px}.boost-value>span{font-size:7px}.boost-sonic i{width:6px;height:5px}}
 @media(prefers-reduced-motion:reduce){.boost-hud *{animation:none!important;transition:none!important}.boost-flow{display:none}}
 

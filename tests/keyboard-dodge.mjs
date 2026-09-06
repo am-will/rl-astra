@@ -14,7 +14,7 @@ try {
   });
   // Use actual browser keyboard events and the game's input/tick path. Measure
   // simulation time so a slow renderer cannot swallow the second jump or turn
-  // a 650 ms dodge into several seconds of wall-clock time in this test.
+  // a short dodge into several seconds of wall-clock time in this test.
   const advance = frames => page.evaluate(frames => {
     const g = window.__game;
     for (let i = 0; i < frames; i++) g.tick(g.controls.read());
@@ -38,7 +38,8 @@ try {
   await mkdir('test-results/refinements', { recursive: true });
   await writeFile('test-results/refinements/keyboard-dodge.json', JSON.stringify(trace, null, 2));
   assert.ok(trace.some(f => f.up < -.98), 'Real keyboard dodge passes through an inverted attitude');
-  assert.ok(trace.some(f => f.age > .65 && f.age < 1 && f.flip === 0 && f.up > .95), 'Dodge follows through upright with W still held');
+  assert.ok(trace.some(f => f.age > .5 && f.age < .65 && f.flip === 0 && f.up > .95), 'Dodge follows through upright within 650 ms with W still held');
+  assert.ok(trace.filter(f => f.age > .75 && f.age < .95).every(f => f.up > .97), 'Recovery stays near level instead of continuing nose-down');
   assert.ok(trace.some(f => f.age > .8 && f.age < 1.5 && f.grounded && f.up > .99), 'Held W lands the car on its wheels');
   console.log('PASS Real keyboard dodge follows through and lands on its wheels with W held');
 } finally { await browser.close(); }

@@ -27,17 +27,19 @@ try {
 
   const spin = [];
   for (const [forward, side] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-    airborne(); const first = [], angles = []; let cutoff, cutoffRotation;
-    for (let i = 0; i < 102; i++) {
+    airborne(); const first = [], angles = []; let cutoff, cutoffRotation, uprightAt = null;
+    for (let i = 0; i < 138; i++) {
       const before = rotation(); step({ jump: i === 0, dodgeForward: forward, dodgeSide: side });
       if (i < 3) first.push(angular().length());
       angles.push(before.angleTo(rotation()));
-      if (i === 77) { cutoff = angular().length(); cutoffRotation = rotation(); }
+      if (i === 59) { cutoff = angular().length(); cutoffRotation = rotation(); }
+      if (i > 48 && uprightAt === null && new Vector3(0, 1, 0).applyQuaternion(rotation()).y > .95) uprightAt = (i + 1) * STEP;
     }
-    spin.push({ forward, side, first, cutoff, recoverySpin: angular().length(), followThrough: cutoffRotation.angleTo(rotation()), poweredAngle: angles.slice(0, 78).reduce((a, b) => a + b, 0), maxStep: Math.max(...angles) });
+    spin.push({ forward, side, first, cutoff, uprightAt, recoverySpin: angular().length(), endUp: new Vector3(0, 1, 0).applyQuaternion(rotation()).y, totalAngle: angles.reduce((a, b) => a + b, 0), followThrough: cutoffRotation.angleTo(rotation()), poweredAngle: angles.slice(0, 60).reduce((a, b) => a + b, 0), maxStep: Math.max(...angles) });
   }
-  check('Quicker dodge torque builds to its spin cap in three physics ticks', spin.every(r => r.first[0] > 2.1 && r.first[0] < 2.5 && r.first[1] > r.first[0] && Math.abs(r.first[2] - 6.325) < .001), spin);
-  check('Quicker dodges retain physical follow-through instead of forcing the end pose', spin.every(r => r.poweredAngle > 5.35 && r.poweredAngle < 5.7 && Math.abs(r.cutoff - 6.325) < .001 && r.followThrough > .75 && r.followThrough < 1.05 && r.recoverySpin > 2.1 && r.recoverySpin < 3.7 && r.maxStep < .075), spin);
+  check('Dodge torque builds to its spin cap in three physics ticks', spin.every(r => r.first[0] > 2.7 && r.first[0] < 3.3 && r.first[1] > r.first[0] && Math.abs(r.first[2] - 8.25) < .001), spin);
+  check('All eight dodges get upright within 650 ms and settle without excess rotation', spin.every(r => r.uprightAt !== null && r.uprightAt <= .65 && r.endUp > .99 && r.totalAngle > 6.1 && r.totalAngle < 6.4 && r.recoverySpin < .1), spin);
+  check('Powered dodges retain smooth physical follow-through', spin.every(r => r.poweredAngle > 5.35 && r.poweredAngle < 5.7 && Math.abs(r.cutoff - 8.25) < .001 && r.followThrough > .6 && r.followThrough < .9 && r.maxStep < .1), spin);
 
   const impulses = [];
   for (const pitch of [0, .8, -1.2]) for (const roll of [0, 1.1]) {
@@ -58,8 +60,8 @@ try {
   for (const initial of [-6, 6]) {
     airborne(); car.body.setLinvel({ x: 0, y: initial, z: 0 }, true);
     const trace = [];
-    for (let i = 0; i < 79; i++) { step({ jump: i === 0, dodgeForward: 1, dodgeSide: 0 }); trace.push(car.body.linvel().y); }
-    vertical.push({ initial, early: trace[16], damped: trace[25], late: trace[76], released: trace[78] });
+    for (let i = 0; i < 61; i++) { step({ jump: i === 0, dodgeForward: 1, dodgeSide: 0 }); trace.push(car.body.linvel().y); }
+    vertical.push({ initial, early: trace[16], damped: trace[25], late: trace[58], released: trace[60] });
   }
   check('Vertical momentum survives the first 150 ms, then the dodge floats before gravity resumes', vertical.every(r => Math.abs(r.early - r.initial) < 1 && Math.abs(r.damped) < .3 && Math.abs(r.late) < .2 && r.released < r.late - .04), vertical);
 

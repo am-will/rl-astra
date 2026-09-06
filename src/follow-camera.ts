@@ -30,6 +30,32 @@ function frameCar(aim: Quaternion, carAim: Quaternion, direction: Vector3, horiz
   }
   aim.copy(candidate.copy(carAim).slerp(aim, low));
 }
+// Fit a sphere around each subject inside the smaller dimension of the lens.
+// At extreme user zooms a subject can fill the lens; retain its center.
+function framing(eye: Vector3, car: Vector3, ball: Vector3, halfFov: number) {
+  const carDirection = car.clone().sub(eye), ballDirection = ball.clone().sub(eye);
+  const carLimit = Math.max(0, halfFov - Math.asin(Math.min(1, 1.1 / carDirection.length())));
+  const ballLimit = Math.max(0, halfFov - Math.asin(Math.min(1, FIELD.ballRadius / ballDirection.length())));
+  carDirection.normalize(); ballDirection.normalize();
+  const span = carDirection.angleTo(ballDirection);
+  return { carDirection, ballDirection, carLimit, ballLimit, span, fits: span <= carLimit + ballLimit };
+}
+
+function frameBall(aim: Quaternion, safeAim: Quaternion, car: Vector3, ball: Vector3, carLimit: number, ballLimit: number, fitCar: boolean) {
+  const forward = new Vector3();
+  const fits = (q: Quaternion) => {
+    forward.set(0, 0, -1).applyQuaternion(q);
+    return (!fitCar || forward.angleTo(car) <= carLimit + 1e-6) && forward.angleTo(ball) <= ballLimit + 1e-6;
+  };
+  if (fits(aim)) return;
+  const candidate = new Quaternion();
+  let low = 0, high = 1;
+  for (let i = 0; i < 14; i++) {
+    const weight = (low + high) / 2;
+    if (fits(candidate.copy(safeAim).slerp(aim, weight))) low = weight; else high = weight;
+  }
+  aim.copy(candidate.copy(safeAim).slerp(aim, low));
+}
 export class FollowCamera {
   settings = loadCameraSettings();
   forward = new Vector3(0, 0, -1);
@@ -45,7 +71,7 @@ export class FollowCamera {
   private mode = 0;
   private previousMode = false;
   private switchTime = 0;
-  private clearance = 20;
+  private clearance = 1;
   private aim = new Quaternion();
   private matrix = new Matrix4();
   update(camera: PerspectiveCamera, pos: Vector3, rotation: Quaternion, ball: Vector3, speed: number, ballCam: boolean, flipping: boolean, dt: number, reset: boolean, clear: (from: Vector3, to: Vector3) => number, lookInput = 0) {
@@ -105,18 +131,19 @@ export class FollowCamera {
     const baseFov = this.settings.fov + (camera.aspect < 1.3 ? 9 : 0) + Math.max(0, speed - 14) * .6;
     camera.fov = reset ? baseFov : MathUtils.damp(camera.fov, baseFov, 5, dt);
     const vertical = MathUtils.degToRad(camera.fov), horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect);
-    const available = Math.min(vertical, horizontal) * .80;
     if (reset) this.distance = baseDistance;
     else [this.distance, this.distanceVelocity] = spring(this.distance, this.distanceVelocity, baseDistance, 10, dt);
     let desired = pos.clone().addScaledVector(this.forward, -this.distance).addScaledVector(UP, height);
     desired.y = MathUtils.clamp(desired.y, .7, FIELD.height - .4);
-    // Keep the lens above solid ground. Walls, ramps and the ceiling cage
-    // never shorten this distance or force a different orbit.
-    const offset = desired.clone().sub(pos), length = offset.length();
-    const limit = clear(pos, desired);
+    const offset = desired.clone().sub(pos), length = offset.length(), limit = Math.min(1, clear(pos, desired) / length);
     if (reset || limit < this.clearance) this.clearance = limit;
     else this.clearance = MathUtils.damp(this.clearance, limit, 6, dt);
-    desired = pos.clone().addScaledVector(offset, Math.min(length, this.clearance) / length);
+    desired = pos.clone().addScaledVector(offset, this.clearance);
+    // Keep the normal boom above the floor in both modes. A high ball can
+    // take the grounded car out of view; never swing underneath the field
+    // just to fit both subjects.
+    desired.y = MathUtils.clamp(desired.y, .7, FIELD.height - .4);
+    const halfFov = Math.min(vertical, horizontal) * .43;
     camera.position.copy(desired);
     const carDirection = carFocus.clone().sub(desired).normalize(), ballDirection = ball.clone().sub(desired).normalize();
     // Honor the selected pitch where it fits, but aim toward the car when a
@@ -124,19 +151,18 @@ export class FollowCamera {
     const carPitch = Math.asin(MathUtils.clamp(-carDirection.y, -1, 1));
     const pitch = MathUtils.clamp(MathUtils.degToRad(this.settings.angle), carPitch - vertical * .28, carPitch + vertical * .28);
     const chase = this.forward.clone().multiplyScalar(Math.cos(pitch)).addScaledVector(UP, -Math.sin(pitch));
-    const span = carDirection.angleTo(ballDirection);
-    // Track the ball as far as the car's visible framing allows. Both subjects
-    // cannot always fit at the selected zoom, so the steerable car takes priority.
-    const minimumWeight = 1 - available * .44 / Math.max(.001, span);
-    const weight = MathUtils.clamp(.54 + (10 - this.settings.angle) * .008, Math.max(0, minimumWeight), 1);
-    // Angle also biases ball-cam framing before applying the car visibility limit.
-    const ballAim = carDirection.clone().lerp(ballDirection, weight).normalize();
+    const pair = framing(desired, carFocus, ball, halfFov);
+    // Prefer a shared view, including when the car rises toward the ball.
+    // When the lens cannot fit both, the ball's visibility takes priority.
+    const aimAngle = Math.max(0, pair.span - pair.ballLimit, Math.min(pair.carLimit, pair.span * (.54 + (10 - this.settings.angle) * .008)));
+    const turnToBall = new Quaternion().setFromUnitVectors(carDirection, ballDirection);
+    const ballAim = carDirection.clone().applyQuaternion(new Quaternion().slerp(turnToBall, pair.span > 1e-6 ? aimAngle / pair.span : 0));
     const carRotation = new Quaternion().setFromRotationMatrix(this.matrix.lookAt(desired, carFocus, UP));
     const chaseRotation = new Quaternion().setFromRotationMatrix(this.matrix.lookAt(desired, desired.clone().add(chase), UP));
     const ballRotation = new Quaternion().setFromRotationMatrix(this.matrix.lookAt(desired, desired.clone().add(ballAim), UP));
-    const targetRotation = chaseRotation.slerp(ballRotation, this.mode);
     const focusDistance = carFocus.distanceTo(desired);
-    frameCar(targetRotation, carRotation, carDirection, horizontal, vertical, focusDistance);
+    frameCar(chaseRotation, carRotation, carDirection, horizontal, vertical, focusDistance);
+    const targetRotation = chaseRotation.slerp(ballRotation, this.mode);
     if (reset) this.aim.copy(targetRotation);
     else {
       const angle = this.aim.angleTo(targetRotation);
@@ -144,7 +170,10 @@ export class FollowCamera {
     }
     // A moving car, changing lens or orbit can invalidate last frame's aim.
     // Enforce the limit after smoothing as well, and retain that corrected aim.
-    frameCar(this.aim, carRotation, carDirection, horizontal, vertical, focusDistance);
+    if (this.mode < .001) frameCar(this.aim, carRotation, carDirection, horizontal, vertical, focusDistance);
+    // Smoothing must not leave a fast rising ball outside the lens. Constrain
+    // the rendered aim as well as the destination, before manual look is added.
+    if (ballCam && this.switchTime === 0) frameBall(this.aim, ballRotation, carDirection, ballDirection, pair.carLimit, pair.ballLimit, pair.fits);
     camera.quaternion.copy(this.aim);
     // Keep the normal lens height, distance and FOV. Only its horizontal orbit
     // and aim change; a held stick makes that orbit relative to the car.

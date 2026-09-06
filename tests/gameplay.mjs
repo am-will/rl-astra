@@ -19,8 +19,8 @@ try {
   check('WebGL scene and detailed assets load', await run(() => window.__game.view.player.root.children.some(x => x.isMesh && x.geometry.attributes.position.count > 1000)), {});
   check('New match starts with ball cam on', await run(() => window.__game.view.ballCam && document.querySelector('#camera-status').textContent === 'ON'), {});
   await page.keyboard.down('w');
-  await page.waitForFunction(() => window.__game.phase === 'playing');
-  await page.waitForFunction(() => window.__game.physics.player.body.translation().z < 25);
+  // Advance real keyboard input in simulation time, independent of GPU load.
+  await run(() => { const g = window.__game; for (let i = 0; i < 600; i++) g.tick(g.controls.read()); });
   await page.keyboard.up('w');
   let s = await run(() => window.__game.snapshot());
   check('Real keyboard starts match and drives', s.car.z < 25 && s.remaining < 300, s.car);
@@ -88,7 +88,9 @@ try {
   s = await run(() => { const g = window.__game; g.scenario('flip-reset'); return g.advance(.2); });
   check('Four wheel ball contact restores flip', s.jumps === 0, { jumps: s.jumps, y: s.car.y });
   const cancelled = await run(() => { const g = window.__game; g.scenario('air'); g.advance(.25, { jump: true, throttle: 1 }); const before = { ...g.physics.player.body.rotation() }, spinBefore = Math.abs(g.physics.player.body.angvel().x); g.advance(.03, { pitch: 1 }); const after = g.physics.player.body.rotation(); return { active: g.physics.player.flipTime > 0, spinBefore, spinAfter: Math.abs(g.physics.player.body.angvel().x), rotationChange: Math.hypot(before.x - after.x, before.y - after.y, before.z - after.z, before.w - after.w) }; });
-  check('Opposing pitch slows rotation without aborting the tackle', cancelled.active && cancelled.spinAfter > 0 && cancelled.spinAfter < cancelled.spinBefore && cancelled.rotationChange > .01 && cancelled.rotationChange < .11, cancelled);
+  // .03 s rounds to four physics ticks; quaternion distance is bounded by
+  // half the undamped angular travel over that interval.
+  check('Opposing pitch slows rotation without aborting the tackle', cancelled.active && cancelled.spinAfter > 0 && cancelled.spinAfter < cancelled.spinBefore && cancelled.rotationChange > .01 && cancelled.rotationChange < cancelled.spinBefore / 60, cancelled);
   s = await run(() => { const g = window.__game; g.scenario('air'); g.physics.player.airTime = 2; return g.advance(.05, { jump: true }); });
   check('Expired airborne dodge cannot be reused', s.jumps === 1, s.jumps);
   const ceiling = await run(() => { const g = window.__game; g.scenario('drive'); g.physics.ball.setTranslation({ x: 0, y: 18, z: 10 }, true); g.physics.ball.setLinvel({ x: 0, y: 35, z: 0 }, true); g.advance(.25); return g.snapshot(); });

@@ -98,7 +98,7 @@ try {
     layouts.push(await page.evaluate(() => {
       const rect = s => document.querySelector(s).getBoundingClientRect();
       const a = rect('.scoreboard'), b = rect('.top-actions'), c = rect('.boost-hud'), d = rect('.bottom-left');
-      return { width: innerWidth, height: innerHeight, clockTop: rect('.clock').top, removed: !document.querySelector('.controls-strip,.player-card'), scoreClear: a.right < b.left, boostInBounds: c.left >= 0 && c.right <= innerWidth && c.bottom <= innerHeight, cameraClear: d.right < c.left || d.bottom < c.top, overflow: document.documentElement.scrollWidth > innerWidth };
+      return { width: innerWidth, height: innerHeight, clockTop: rect('.clock').top, removed: !document.querySelector('.controls-strip,.player-card'), scoreClear: a.right < b.left || a.bottom < b.top, boostInBounds: c.left >= 0 && c.right <= innerWidth && c.bottom <= innerHeight, cameraClear: d.right < c.left || d.bottom < c.top, overflow: document.documentElement.scrollWidth > innerWidth };
     }));
   }
   check('HUD fits desktop, portrait and landscape without overlapping controls', layouts.every(l => l.scoreClear && l.boostInBounds && l.cameraClear && !l.overflow), layouts);
