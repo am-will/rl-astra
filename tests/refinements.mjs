@@ -10,8 +10,8 @@ try {
   await page.goto('http://127.0.0.1:5179');await page.waitForFunction(()=>window.__game?.view && !document.querySelector('#loading'));
   for(const [name,input] of [['forward',{throttle:1,pitch:-1}],['backward',{throttle:-1,pitch:1}],['side',{steer:1}],['diagonal',{throttle:1,steer:-1,pitch:-1}]]){
     const data=await page.evaluate(input=>{const g=window.__game;g.scenario('air');g.advance(.325,{...input,jump:true});const middle=g.snapshot().rotation;g.advance(.325,input);const end=g.snapshot().rotation;const angular=g.physics.player.body.angvel();g.advance(.2,{throttle:input.throttle||0,pitch:input.pitch||0});return{middle,end,angular,recovery:g.snapshot().rotation};},input);
-    check(`${name} dodge performs exactly one flip`,Math.abs(data.end.w)> .99999 && Math.hypot(data.angular.x,data.angular.y,data.angular.z)<.001 && Math.abs(data.middle.w)<.1,data);
-    check(`${name} dodge has no momentum overshoot`,Math.abs(data.recovery.w)>.99999,data.recovery);
+    check(`${name} dodge retains spin at the end of its powered phase`,Math.abs(data.end.w)>.85 && Math.abs(data.end.w)<.98 && Math.abs(Math.hypot(data.angular.x,data.angular.y,data.angular.z)-6.325)<.001 && Math.abs(data.middle.w)<.35,data);
+    check(`${name} dodge follows through near upright`,Math.abs(data.recovery.w)>.99,data.recovery);
   }
   const roll=await page.evaluate(()=>{const g=window.__game;g.scenario('air');g.advance(.35,{roll:1});const speed=g.physics.player.body.angvel();const initial=g.view.player.root.quaternion.clone();g.advance(2*Math.PI/5.5,{roll:1});const current=g.view.player.root.quaternion;return{speed,turnError:initial.angleTo(current)};});
   check('Air roll reaches RL angular limit',Math.abs(Math.abs(roll.speed.z)-5.5)<.01,roll);

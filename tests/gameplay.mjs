@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+await page.addInitScript(() => Object.defineProperty(navigator, 'getGamepads', { value: () => [] }));
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', e => { if (e.type() === 'error') errors.push(e.text()); });
@@ -86,8 +87,8 @@ try {
   check('Car climbs curved wall transition', s.car.y > 5 && Math.abs(s.car.x) < 41, s.car);
   s = await run(() => { const g = window.__game; g.scenario('flip-reset'); return g.advance(.2); });
   check('Four wheel ball contact restores flip', s.jumps === 0, { jumps: s.jumps, y: s.car.y });
-  const cancelled = await run(() => { const g = window.__game; g.scenario('air'); g.advance(.25, { jump: true, throttle: 1 }); const before = { ...g.physics.player.body.rotation() }; g.advance(.03, { pitch: 1 }); const after = g.physics.player.body.rotation(); return { active: g.physics.player.flipTime > 0, rotationChange: Math.hypot(before.x - after.x, before.y - after.y, before.z - after.z, before.w - after.w) }; });
-  check('Opposing pitch pauses forward rotation without aborting the tackle', cancelled.active && cancelled.rotationChange < .001, cancelled);
+  const cancelled = await run(() => { const g = window.__game; g.scenario('air'); g.advance(.25, { jump: true, throttle: 1 }); const before = { ...g.physics.player.body.rotation() }, spinBefore = Math.abs(g.physics.player.body.angvel().x); g.advance(.03, { pitch: 1 }); const after = g.physics.player.body.rotation(); return { active: g.physics.player.flipTime > 0, spinBefore, spinAfter: Math.abs(g.physics.player.body.angvel().x), rotationChange: Math.hypot(before.x - after.x, before.y - after.y, before.z - after.z, before.w - after.w) }; });
+  check('Opposing pitch slows rotation without aborting the tackle', cancelled.active && cancelled.spinAfter > 0 && cancelled.spinAfter < cancelled.spinBefore && cancelled.rotationChange > .01 && cancelled.rotationChange < .11, cancelled);
   s = await run(() => { const g = window.__game; g.scenario('air'); g.physics.player.airTime = 2; return g.advance(.05, { jump: true }); });
   check('Expired airborne dodge cannot be reused', s.jumps === 1, s.jumps);
   const ceiling = await run(() => { const g = window.__game; g.scenario('drive'); g.physics.ball.setTranslation({ x: 0, y: 18, z: 10 }, true); g.physics.ball.setLinvel({ x: 0, y: 35, z: 0 }, true); g.advance(.25); return g.snapshot(); });

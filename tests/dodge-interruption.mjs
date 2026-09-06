@@ -51,11 +51,12 @@ try {
       for (const forward of [-1, 1]) for (const side of [0, 1, -1]) {
         reset(); step({ jump: true, dodgeForward: forward, dodgeSide: side });
         for (let i = 1; i < 30; i++) step({});
-        const before = rotation();
+        const before = rotation(), pitchSpeedBefore = Math.abs(new Vector3().copy(car.body.angvel()).applyQuaternion(before.clone().invert()).x);
         for (let i = 0; i < 8; i++) step({ pitch: forward });
         const cancelled = rotation(), delta = before.clone().invert().multiply(cancelled), active = car.flipTime > 0;
+        const pitchSpeedAfter = Math.abs(new Vector3().copy(car.body.angvel()).applyQuaternion(cancelled.clone().invert()).x);
         for (let i = 0; i < 3; i++) step({});
-        held.push({ forward, side, active, pitchChange: Math.abs(delta.x), yawChange: Math.abs(delta.y), rollChange: Math.abs(delta.z), resumedAngle: cancelled.angleTo(rotation()) });
+        held.push({ forward, side, active, pitchSpeedBefore, pitchSpeedAfter, pitchChange: Math.abs(delta.x), yawChange: Math.abs(delta.y), rollChange: Math.abs(delta.z), resumedAngle: cancelled.angleTo(rotation()) });
       }
       for (const speed of [0, 14, 23]) for (const delay of [6, 12, 24, 42]) for (const side of [0, 1, -1]) {
         physics.resetCar(car, 0, 25); for (let i = 0; i < 90; i++) step({});
@@ -95,13 +96,15 @@ try {
       return { uninterrupted, pulses, held, ground, gamepad, keyboard };
     } finally { physics.world.free(); }
   });
-  check('All eight tackle directions complete one bounded rotation', data.uninterrupted.every(r => r.middleUp < -.99 && r.endUp > .999 && r.endError < .001 && r.recoveryError < .001 && r.angularSpeed < .001), data.uninterrupted);
-  check('Brief counter-pitch cannot abort a tackle or leave it upside down', data.pulses.every(r => r.activeAfterPulse && r.finished && r.endUp > .99 && r.maxStep < .085), data.pulses);
-  check('Held counter-pitch pauses pitch while diagonal roll continues', data.held.every(r => r.active && r.pitchChange < .001 && r.yawChange < .001 && (r.side === 0 ? r.rollChange < .001 : r.rollChange > .1)), data.held);
-  check('Releasing counter-pitch resumes rotation without snapping', data.held.every(r => r.resumedAngle > .2 && r.resumedAngle < .25), data.held);
+  // The 650 ms interval is powered torque, not an animation that finishes a
+  // whole turn. The car retains spin and follows through under air damping.
+  check('All eight dodges rotate through inversion and retain follow-through at torque cutoff', data.uninterrupted.every(r => r.middleUp < -.99 && r.endError > .6 && r.endError < .95 && r.recoveryError > .75 && r.recoveryError < 1.05 && Math.abs(r.angularSpeed - 6.325) < .001), data.uninterrupted);
+  check('Brief counter-pitch cannot abort a tackle or cause a pose jump', data.pulses.every(r => r.activeAfterPulse && r.finished && Math.abs(r.endUp - data.uninterrupted.find(b => b.forward === r.forward && b.side === r.side).endUp) < .04 && r.maxStep < .075), data.pulses);
+  check('Held counter-pitch damps existing pitch while diagonal roll continues', data.held.every(r => r.active && r.pitchSpeedAfter > 0 && r.pitchSpeedAfter < r.pitchSpeedBefore * .85 && r.pitchChange > .01 && r.yawChange < .02 && (r.side === 0 ? r.rollChange < .001 : r.rollChange > .1)), data.held);
+  check('Releasing counter-pitch resumes rotation without snapping', data.held.every(r => r.resumedAngle > .18 && r.resumedAngle < .24), data.held);
   check('Early and late ground tackles land on their wheels at every tested speed', data.ground.every(r => r.started && !r.abortedInverted && r.grounded && r.up > .99), data.ground);
-  check('A transient controller stick reversal does not kill the tackle', data.gamepad.launch && data.gamepad.pulsePitch > .3 && data.gamepad.activeAfterPulse && data.gamepad.endUp > .99, data.gamepad);
-  check('A brief keyboard direction reversal still finishes upright', data.keyboard.finished && data.keyboard.endUp > .99, data.keyboard);
+  check('A transient controller stick reversal does not kill the tackle', data.gamepad.launch && data.gamepad.pulsePitch > .3 && data.gamepad.activeAfterPulse && Math.abs(data.gamepad.endUp - data.uninterrupted[0].endUp) < .03, data.gamepad);
+  check('A brief keyboard direction reversal preserves the dodge trajectory', data.keyboard.finished && Math.abs(data.keyboard.endUp - data.uninterrupted[0].endUp) < .03, data.keyboard);
   check('No browser errors', errors.length === 0, errors);
   await mkdir('test-results/dodge-interruption', { recursive: true });
   await writeFile('test-results/dodge-interruption/checks.json', JSON.stringify({ results, errors }, null, 2));

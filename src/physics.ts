@@ -5,10 +5,15 @@ import { arenaSurfaces, goalArchHeight } from './arena';
 
 const UP = new Vector3(0, 1, 0);
 const v3 = (v: { x: number; y: number; z: number }) => new Vector3(v.x, v.y, v.z);
+const FLIP_DURATION = .65;
+// Keep the reference torque/float behavior with a slightly quicker tackle.
+const FLIP_SPEED_SCALE = 1.15;
+const FLIP_MAX_SPIN = 5.5 * FLIP_SPEED_SCALE;
+const AIR_TORQUE_SCALE = 2 * Math.PI / 65536 * 1000;
 export interface Pad { x: number; z: number; big: boolean; cooldown: number; }
 export interface Car {
   body: RAPIER.RigidBody; collider: RAPIER.Collider; boost: number; grounded: boolean; wheels: number;
-  jumpCount: number; airTime: number; jumpTime: number; flipTime: number; flipAxis: Vector3; flipRotation: Quaternion; pitchLock: number;
+  jumpCount: number; airTime: number; jumpTime: number; flipTime: number; flipAxis: Vector3; pitchLock: number;
   boosting: boolean; speed: number; supersonic: boolean; supersonicGrace: number; touchCooldown: number; resetCooldown: number; demolished: number;
   steer: number; drifting: boolean; throttle: number;
   previousPosition: Vector3; previousRotation: Quaternion;
@@ -45,7 +50,7 @@ export class Physics {
     // Explicit pair friction keeps the ball's existing response while letting
     // the chassis slide without the arena's friction dominating it. Max wins
     // over the car's Min: ball/car=.225, ball/floor=.5, ball/wall=.475.
-    this.ballCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(30).setRestitution(.6).setFriction(.225).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max), this.ball);
+    this.ballCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(30).setRestitution(.55).setFriction(.225).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max), this.ball);
     this.player = this.createCar(0, 29, 0);
     this.bot = this.createCar(0, -29, Math.PI);
     for (const z of [-35, -18, 0, 18, 35]) for (const x of [-19, 0, 19]) {
@@ -75,7 +80,7 @@ export class Physics {
   createCar(x: number, z: number, yaw: number): Car {
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, .38, z).setRotation(new Quaternion().setFromAxisAngle(UP, yaw)).setLinearDamping(.05).setAngularDamping(0).setCcdEnabled(true).setCanSleep(false));
     const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setFriction(.035).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(.08), body);
-    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), flipRotation: new Quaternion(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, throttle: 0, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
+    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, throttle: 0, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
   }
   resetCar(car: Car, x = 0, z = car === this.player ? 29 : -29, yaw = car === this.player ? 0 : Math.PI) {
     car.body.setEnabled(car !== this.bot || this.botEnabled);
@@ -269,13 +274,13 @@ export class Physics {
         // Roll reaches the 5.5 rad/s cap in ~0.24 s (one sustained turn: 1.14 s).
         const angular = v3(body.angvel()).applyQuaternion(q.clone().invert());
         const pitch = car.pitchLock > 0 ? 0 : input.pitch;
-        const scale = 2 * Math.PI / 65536 * 1000;
+        const scale = AIR_TORQUE_SCALE;
         angular.x += (pitch * 130 - angular.x * 30 * (1 - Math.abs(pitch))) * scale * dt;
         const yaw = input.yaw ?? input.steer;
         angular.y += (yaw * 95 - angular.y * 20 * (1 - Math.abs(yaw))) * scale * dt;
         angular.z += (-input.roll * 400 - angular.z * 50) * scale * dt;
-        if (car.pitchLock > 0) angular.x = 0;
-        if (angular.length() > 5.5) angular.setLength(5.5);
+        const spinLimit = car.pitchLock > 0 ? FLIP_MAX_SPIN : 5.5;
+        if (angular.length() > spinLimit) angular.setLength(spinLimit);
         body.setAngvel(angular.applyQuaternion(q), true);
       }
     }
@@ -300,26 +305,44 @@ export class Physics {
         car.jumpCount = 2;
         const dodgeForward = input.dodgeForward ?? input.throttle, dodgeSide = input.dodgeSide ?? input.steer;
         if (Math.abs(dodgeForward) + Math.abs(dodgeSide) > .1) {
-          const direction = forward.clone().multiplyScalar(dodgeForward).addScaledVector(right, -dodgeSide).normalize();
-          velocity.addScaledVector(direction, 5); velocity.y = Math.max(velocity.y, 1.3);
-          car.flipAxis.copy(new Vector3(-dodgeForward, 0, dodgeSide).normalize()); car.flipRotation.copy(q); car.flipTime = .65;
+          // Dodge impulse follows the car's heading projected onto the field,
+          // even when pitched or rolled. It never adds an artificial hop.
+          const heading = forward.clone().setY(0);
+          if (heading.lengthSq() < 1e-8) heading.crossVectors(UP, right);
+          heading.normalize();
+          const sideways = new Vector3().crossVectors(heading, UP);
+          const length = Math.hypot(dodgeForward, dodgeSide), front = dodgeForward / length, side = -dodgeSide / length;
+          const signedSpeed = velocity.dot(forward), speedRatio = Math.min(1, Math.abs(signedSpeed) / CAR.maxSpeed);
+          const backward = Math.abs(signedSpeed) < 1 ? front < 0 : front !== 0 && Math.sign(front) !== Math.sign(signedSpeed);
+          velocity.addScaledVector(heading, front * 5 * (backward ? 16 / 15 * (1 + 1.5 * speedRatio) : 1));
+          velocity.addScaledVector(sideways, side * 5 * (1 + .9 * speedRatio));
+          car.flipAxis.set(-front, 0, -side); car.flipTime = FLIP_DURATION;
         } else velocity.addScaledVector(up, CAR.jumpSpeed);
         this.onJump(car, car.flipTime > 0);
       }
     }
     if (car.jumpTime > 0) { if (input.jumpHeld) velocity.addScaledVector(up, CAR.jumpHoldAcceleration * dt); car.jumpTime -= dt; }
     if (car.flipTime > 0) {
-      // Counter-pitch only attenuates pitch while held. Ending the entire
-      // dodge on one opposite input could freeze it upside down and also
-      // incorrectly cancel the roll component of diagonal tackles.
-      const axis = car.flipAxis.clone();
-      if (input.pitch * axis.x < 0 && car.flipTime < .45) axis.x *= 1 - Math.min(1, Math.abs(input.pitch));
-      const rotationSpeed = axis.length(), flipDt = Math.min(dt, car.flipTime);
-      if (rotationSpeed > 0) car.flipRotation.multiply(new Quaternion().setFromAxisAngle(axis.divideScalar(rotationSpeed), rotationSpeed * flipDt / .65 * Math.PI * 2)).normalize();
+      const elapsed = FLIP_DURATION - car.flipTime, flipDt = Math.min(dt, car.flipTime);
+      const angular = v3(body.angvel()).applyQuaternion(q.clone().invert());
+      // Reference torque/spin, accelerated together to keep the three-tick rise.
+      // Counter-pitch reduces torque after five ticks; existing spin decays
+      // through air damping instead of stopping the car's rotation instantly.
+      const cancel = elapsed + 1e-7 >= 5 * STEP && input.pitch * car.flipAxis.x < 0 ? Math.min(1, Math.abs(input.pitch)) : 0;
+      angular.x += car.flipAxis.x * 224 * FLIP_SPEED_SCALE * (1 - cancel) * flipDt;
+      angular.z += car.flipAxis.z * 260 * FLIP_SPEED_SCALE * flipDt;
+      if (cancel > 0) {
+        angular.x -= angular.x * 30 * AIR_TORQUE_SCALE * flipDt;
+        const yaw = input.yaw ?? input.steer;
+        angular.y += (yaw * 95 - angular.y * 20 * (1 - Math.abs(yaw))) * AIR_TORQUE_SCALE * flipDt;
+        angular.z += (-input.roll * 400 - angular.z * 50) * AIR_TORQUE_SCALE * flipDt;
+      }
+      body.setAngvel(angular.applyQuaternion(q), true);
+      // Preserve the start of the jump, then briefly arrest vertical movement
+      // while the dodge is powered. Upward boost is free again after 210 ms.
+      const age = elapsed + flipDt;
+      if (age + 1e-7 >= .15 && (velocity.y < 0 || age < .21)) velocity.y *= .65 ** (flipDt / STEP);
       car.flipTime = Math.max(0, car.flipTime - dt);
-      // Integrate only the bounded dodge rotation, so releasing counter-pitch
-      // resumes from this pose without snapping or leaving residual spin.
-      body.setRotation(car.flipRotation, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       if (car.flipTime < 1e-7) { car.flipTime = 0; car.pitchLock = .3; }
     }
     if (car.recoveryTime > 0) {
@@ -327,6 +350,29 @@ export class Physics {
       const t = 1 - car.recoveryTime / .4;
       body.setRotation(car.recoveryStart.clone().slerp(car.recoveryTarget, t * t * (3 - 2 * t)), true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true); car.grounded = false;
+    }
+    if (!car.grounded && car.flipTime <= 0 && car.recoveryTime <= 0 && car.jumpTime <= 0 && input.throttle !== 0 && !input.jump) {
+      // A nose/side landing can hold the tires clear of their suspension rays.
+      // Like the reference's auto-roll, use real chassis/world contacts to
+      // turn toward wheel support. Free aerials and ball contacts get no help.
+      const support = new Vector3();
+      this.world.contactPairsWith(car.collider, other => {
+        if (other.parent()) return;
+        this.world.contactPair(car.collider, other, manifold => {
+          for (let i = 0; i < manifold.numSolverContacts(); i++) {
+            if (manifold.solverContactDist(i) > .015) continue;
+            const n = v3(manifold.normal()), towardCar = pos.clone().sub(v3(manifold.solverContactPoint(i)));
+            if (n.dot(towardCar) < 0) n.negate();
+            support.add(n);
+          }
+        });
+      });
+      if (support.lengthSq() > .01) {
+        support.normalize();
+        const angular = v3(body.angvel()).addScaledVector(new Vector3().crossVectors(up, support), 80 * dt);
+        body.setAngvel(angular, true);
+        body.addForce(support.multiplyScalar(-car.body.mass()), true);
+      }
     }
     if (car.boosting) {
       velocity.addScaledVector(forward, (car.grounded ? CAR.boostGroundAcceleration : CAR.boostAirAcceleration) * dt);
@@ -351,6 +397,13 @@ export class Physics {
     this.incomingCarVelocities[1].copy(this.bot.body.linvel());
     this.bot.body.setEnabled(this.botEnabled && this.bot.demolished <= 0);
     this.world.step();
+    // The reference caps stored spin after integrating torque and collisions.
+    // Capping before the solver also caps this tick's torque-driven rotation.
+    for (const car of [this.player, ...(this.botEnabled ? [this.bot] : [])]) {
+      const spin = v3(car.body.angvel());
+      const spinLimit = car.flipTime > 0 || car.pitchLock > 0 ? FLIP_MAX_SPIN : 5.5;
+      if (spin.length() > spinLimit) car.body.setAngvel(spin.setLength(spinLimit), true);
+    }
     if (this.ball.isEnabled()) {
       const impact = v3(this.ball.linvel()).sub(incomingBallVelocity).length();
       if (impact > 2) {
@@ -367,7 +420,7 @@ export class Physics {
         const delta = v3(this.ball.translation()).sub(v3(car.body.translation())).normalize();
         const speed = v3(car.body.linvel()).length();
         const impulse = delta.clone().multiplyScalar(30 * (1.3 + speed * .26));
-        impulse.y += 17.5 + speed * .9;
+        impulse.y += 16.5 + speed * .85;
         this.ball.applyImpulse(impulse, true);
         // Trim the velocity gained from a gentle touch, preserving incoming
         // ball momentum and the existing power of fast hits. Only head-on,
