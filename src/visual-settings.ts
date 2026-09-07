@@ -1,4 +1,4 @@
-import { CAMERA_DEFAULTS, CAMERA_RANGES, type CameraSettings } from './camera-settings';
+import { CAMERA_DEFAULTS, CAMERA_RANGES, type CameraSlider } from './camera-settings';
 import { navigateMenu } from './controls-menu';
 import type { MenuInput } from './controls';
 import type { GameRenderer, QualityLevel, BoostStyle } from './render';
@@ -21,7 +21,8 @@ export class VisualSettings {
       <label class="visual-select">Paint design<select id="paint-job">${PAINT_JOBS.map(job => `<option value="${job.id}">${job.name}${job.id === 'ultraviolet' ? ' · animated' : ''}</option>`).join('')}</select></label>
       <div class="paint-swatches" role="group" aria-label="Paint designs">${PAINT_JOBS.map(job => `<button class="paint-swatch paint-${job.id}" data-paint="${job.id}" aria-label="${job.name}" title="${job.name}" style="--paint:${job.color};--accent:${job.accent}"><span></span></button>`).join('')}</div><p class="visual-description" id="paint-description"></p><div class="paint-angles" role="group" aria-label="Paint preview angle" hidden>${(['front', 'side', 'rear'] as const).map(angle => `<button data-paint-angle="${angle}">${angle.toUpperCase()}</button>`).join('')}</div>
       <div class="visual-section-title"><h3>CAMERA</h3><button id="preview-camera">PREVIEW CAR CAM</button></div>
-      ${(Object.keys(CAMERA_DEFAULTS) as (keyof CameraSettings)[]).map(key => { const [min, max, step] = CAMERA_RANGES[key], [label, low, high] = labels[key]; return `<label class="camera-setting"><span>${label}<output id="camera-${key}-value"></output></span><input id="camera-${key}" aria-label="${label}" data-camera="${key}" type="range" min="${min}" max="${max}" step="${step}"><small><span>${low}</span><span>${high}</span></small></label>`; }).join('')}
+      ${(Object.keys(CAMERA_RANGES) as CameraSlider[]).map(key => { const [min, max, step] = CAMERA_RANGES[key], [label, low, high] = labels[key]; return `<label class="camera-setting"><span>${label}<output id="camera-${key}-value"></output></span><input id="camera-${key}" aria-label="${label}" data-camera="${key}" type="range" min="${min}" max="${max}" step="${step}"><small><span>${low}</span><span>${high}</span></small></label>`; }).join('')}
+      <label class="visual-select">Camera shake<select id="camera-shake"><option value="off">Off</option><option value="on">On</option></select></label><p class="visual-description">Shake the camera on hits, demolitions, and goals. Off by default.</p>
       <p class="visual-description">Ball cam adjusts your angle to keep the ball in view.</p><button class="visual-reset" id="reset-camera">Reset camera defaults</button>
       <div class="visual-section-title"><h3>LOOK & FEEL</h3></div>
       <label class="visual-select">On-screen text<select id="text-style"><option value="original">Original</option><option value="cartoon">Cartoon</option></select></label><p class="visual-description">Original's thin gold lettering and goal award, or Cartoon's bold comic announcements.</p>
@@ -39,10 +40,13 @@ export class VisualSettings {
     this.root.querySelector('#paint-job')!.addEventListener('change', event => this.selectPaint((event.target as HTMLSelectElement).value as PaintJob));
     this.root.querySelectorAll<HTMLButtonElement>('[data-paint]').forEach(button => button.addEventListener('click', () => this.selectPaint(button.dataset.paint as PaintJob)));
     this.root.addEventListener('input', event => {
-      const input = event.target as HTMLInputElement, key = input.dataset.camera as keyof CameraSettings;
+      const input = event.target as HTMLInputElement, key = input.dataset.camera as CameraSlider;
       if (!key) return;
       view.paintPreview = false;
       view.followCamera.settings[key] = Number(input.value); this.saveCamera(); this.render();
+    });
+    this.root.querySelector('#camera-shake')!.addEventListener('change', event => {
+      view.followCamera.settings.shake = (event.target as HTMLSelectElement).value === 'on'; this.saveCamera(); this.render();
     });
     this.root.querySelector('#visual-quality')!.addEventListener('change', event => {
       view.setQuality((event.target as HTMLSelectElement).value as QualityLevel); this.render(); this.onChange();
@@ -76,11 +80,12 @@ export class VisualSettings {
     catch { this.root.querySelector('#visual-save')!.textContent = 'APPLIED FOR THIS SESSION'; }
   }
   render() {
-    for (const key of Object.keys(CAMERA_DEFAULTS) as (keyof CameraSettings)[]) {
+    for (const key of Object.keys(CAMERA_RANGES) as CameraSlider[]) {
       const value = this.view.followCamera.settings[key];
       this.root.querySelector<HTMLInputElement>(`#camera-${key}`)!.value = String(value);
       this.root.querySelector(`#camera-${key}-value`)!.textContent = key === 'fov' || key === 'angle' ? `${value}°` : value.toFixed(2);
     }
+    this.root.querySelector<HTMLSelectElement>('#camera-shake')!.value = this.view.followCamera.settings.shake ? 'on' : 'off';
     this.root.querySelector<HTMLSelectElement>('#visual-quality')!.value = this.view.qualityLevel;
     this.root.querySelector<HTMLSelectElement>('#motion-blur')!.value = this.view.motionBlur ? 'on' : 'off';
     this.root.querySelector<HTMLSelectElement>('#boost-style')!.value = this.view.boostStyle;

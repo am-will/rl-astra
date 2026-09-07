@@ -54,7 +54,7 @@ export class GameRenderer {
   boosts: [RocketBoost, RocketBoost];
   infernos: [FlameSmoke, FlameSmoke];
   exhausts: [ExhaustBackfire, ExhaustBackfire];
-  boostStyle: BoostStyle = 'classic';
+  boostStyle: BoostStyle = 'inferno';
   paintJob: PaintJob = 'ultraviolet';
   carPaint!: CarPaint;
   paintPreview = false;
@@ -110,7 +110,8 @@ export class GameRenderer {
       const saved = localStorage.getItem('champions-field.quality');
       if (saved === 'performance' || saved === 'high' || saved === 'ultra') this.qualityLevel = saved;
       this.motionBlur = localStorage.getItem('champions-field.motion-blur') !== 'off';
-      if (localStorage.getItem('champions-field.boost-style') === 'inferno') this.boostStyle = 'inferno';
+      const boost = localStorage.getItem('champions-field.boost-style');
+      if (boost === 'classic' || boost === 'inferno') this.boostStyle = boost;
       const paint = localStorage.getItem('champions-field.paint-job');
       if (validPaintJob(paint)) this.paintJob = paint;
     } catch { /* Use the default visual preset when storage is unavailable. */ }
@@ -318,7 +319,7 @@ export class GameRenderer {
     this.cameraReady = true;
     this.shake = Math.max(0, this.shake - dt * 1.5);
     // Render shake never feeds back into the next frame's follow position.
-    if (dt > 0) { this.camera.position.x += (Math.random() - .5) * (this.shake * .15 + this.effects.explosion.impact * .35); this.camera.position.y += (Math.random() - .5) * (this.shake * .1 + this.effects.explosion.impact * .23); }
+    if (this.followCamera.settings.shake && dt > 0) { this.camera.position.x += (Math.random() - .5) * (this.shake * .15 + this.effects.explosion.impact * .35); this.camera.position.y += (Math.random() - .5) * (this.shake * .1 + this.effects.explosion.impact * .23); }
     if (this.paintPreview) {
       const narrow = innerWidth <= 650;
       const angle = { front: [-2.2, 1.15, -2.65], side: [-3.15, 1.05, -.65], rear: [2.15, 1.2, 2.7] }[this.paintPreviewAngle];

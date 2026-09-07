@@ -14,7 +14,7 @@ const check = (name, pass, detail) => {
 let physics;
 try {
   const { Physics } = await server.ssrLoadModule('/src/physics.ts');
-  const { emptyInput, STEP, FIELD } = await server.ssrLoadModule('/src/config.ts');
+  const { emptyInput, STEP } = await server.ssrLoadModule('/src/config.ts');
   physics = new Physics(); await physics.init(); physics.botEnabled = false;
   const car = physics.player, neutral = emptyInput();
   const step = input => physics.step({ ...neutral, ...input }, neutral);
@@ -89,31 +89,7 @@ try {
   }
   check('Wall contacts during a dodge keep the solver pose instead of snapping back to an animation', collisions.every(r => r.poseJump < .00001 && r.spin > .1), collisions);
 
-  // Measured head-on contacts from checkpoint 90ff395, before this change.
-  const before = [[2, 2.001831, -4.262527], [4, 2.747504, -5.819578], [7, 4.018580, -8.863477], [14, 7.430232, -16.821615], [23, 11.022222, -27.389423]];
-  const hits = [];
-  for (const [speed, oldY, oldZ] of before) {
-    physics.reset(); physics.resetCar(car, 0, 3); for (let i = 0; i < 36; i++) step({});
-    physics.ball.setTranslation({ x: 0, y: .92, z: 1.3 }, true); car.body.setLinvel({ x: 0, y: 0, z: -speed }, true);
-    let hit = false; physics.onHit = () => { hit = true; };
-    for (let i = 0; i < 120; i++) {
-      step({ throttle: 1, boost: speed > 20 });
-      if (hit) { const v = physics.ball.linvel(); hits.push({ speed, powerRatio: v.z / oldZ, liftRatio: v.y / oldY }); break; }
-    }
-  }
-  check('Ball hits have only a small reduction in speed and lift at every approach speed', hits.length === before.length && hits.every(r => r.powerRatio > .98 && r.powerRatio < .995 && r.liftRatio > .965 && r.liftRatio < .99), hits);
-  const bounces = [];
-  for (const [height, oldPeak] of [[2, .394892], [5, 1.445101], [10, 3.110826]]) {
-    physics.reset(); physics.resetCar(car, 20, 25); physics.ball.setTranslation({ x: 0, y: height, z: 0 }, true);
-    let bounced = false, peak = 0;
-    for (let i = 0; i < 600; i++) {
-      step({}); const v = physics.ball.linvel();
-      if (v.y > .2) bounced = true;
-      if (bounced) { peak = Math.max(peak, physics.ball.translation().y - FIELD.ballRadius); if (v.y < 0) break; }
-    }
-    bounces.push({ height, peak, ratio: peak / oldPeak });
-  }
-  check('Floor rebound height drops slightly, without making the ball dead', bounces.every(r => r.ratio > .9 && r.ratio < .95), bounces);
+  // Ball trajectories now use compiled RocketSim fixtures in ball-physics.mjs.
   await mkdir('test-results/physics-feel', { recursive: true });
   await writeFile('test-results/physics-feel/checks.json', JSON.stringify(results, null, 2));
 } finally { physics?.world.free(); await server.close(); }

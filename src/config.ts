@@ -1,5 +1,5 @@
 // Standard soccar dimensions / 100; RLBot Useful Game Values and RocketSim.
-export const FIELD = { width: 40.96, length: 51.2, height: 20.48, goalWidth: 8.92755, goalHeight: 6.42775, goalDepth: 8.8, ballRadius: .92, rampRadius: 2.56, cornerCut: 11.52 };
+export const FIELD = { width: 40.96, length: 51.2, height: 20.48, goalWidth: 8.92755, goalHeight: 6.42775, goalDepth: 8.8, ballRadius: .9125, rampRadius: 2.56, cornerCut: 11.52 };
 // One world unit is approximately 100 Rocket League units. Reference: RocketSim RLConst.h.
 export const CAR = { maxSpeed: 23, driveSpeed: 14.1, supersonic: 22, gravity: 6.5, jumpSpeed: 875 / 300, jumpHoldAcceleration: 4375 / 300, boostGroundAcceleration: 2975 / 300, boostAirAcceleration: 3175 / 300, boostDrain: 100 / 3 };
 export const BLUE = 0x168bff;

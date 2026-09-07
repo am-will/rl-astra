@@ -1,0 +1,521 @@
+{
+  "revision": "c2baacb8f4b441dd8505e63c2aeb5a1679b60b02",
+  "drops": [
+    {
+      "height": 2,
+      "peak": 0.390294492,
+      "incoming": -3.7054379,
+      "outgoing": 2.22269869
+    },
+    {
+      "height": 5,
+      "peak": 1.42758667,
+      "incoming": -7.18955708,
+      "outgoing": 4.31263924
+    },
+    {
+      "height": 10,
+      "peak": 3.11188602,
+      "incoming": -10.6672668,
+      "outgoing": 6.39873409
+    }
+  ],
+  "angledBounces": [
+    {
+      "spin": 0,
+      "velocity": [
+        5.69690657,
+        3.94600821,
+        2.13633966
+      ],
+      "angularVelocity": [
+        2.10674047,
+        0,
+        -5.61797476
+      ]
+    },
+    {
+      "spin": -4,
+      "velocity": [
+        6.73976374,
+        3.94600821,
+        2.13633966
+      ],
+      "angularVelocity": [
+        1.8129555,
+        0,
+        -5.71954489
+      ]
+    },
+    {
+      "spin": 4,
+      "velocity": [
+        4.65404892,
+        3.94600821,
+        2.1363399
+      ],
+      "angularVelocity": [
+        2.34119439,
+        0,
+        -5.10032749
+      ]
+    }
+  ],
+  "flight": [
+    {
+      "ticks": 1,
+      "position": [
+        0.0833121836,
+        10.0412045,
+        -0.0666497499
+      ],
+      "velocity": [
+        9.99746227,
+        4.94456387,
+        -7.99796915
+      ],
+      "spin": [
+        2,
+        3,
+        -1
+      ]
+    },
+    {
+      "ticks": 60,
+      "position": [
+        4.96148872,
+        11.6588087,
+        -3.96919084
+      ],
+      "velocity": [
+        9.84885788,
+        1.69864416,
+        -7.87908411
+      ],
+      "spin": [
+        2,
+        3,
+        -1
+      ]
+    },
+    {
+      "ticks": 120,
+      "position": [
+        9.84798908,
+        11.6796541,
+        -7.87838984
+      ],
+      "velocity": [
+        9.69999981,
+        -1.55281579,
+        -7.75999737
+      ],
+      "spin": [
+        2,
+        3,
+        -1
+      ]
+    }
+  ],
+  "hitFormula": [
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        0
+      ],
+      "addedVelocity": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        2
+      ],
+      "addedVelocity": [
+        0,
+        0.273722857,
+        -1.27085626
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        5
+      ],
+      "addedVelocity": [
+        0,
+        0.684307218,
+        -3.17714071
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        14
+      ],
+      "addedVelocity": [
+        0,
+        1.76867092,
+        -8.21168709
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        23
+      ],
+      "addedVelocity": [
+        0,
+        2.66353416,
+        -12.3664112
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        46
+      ],
+      "addedVelocity": [
+        0,
+        2.90567374,
+        -13.4906282
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        60
+      ],
+      "addedVelocity": [
+        0,
+        2.90567374,
+        -13.4906282
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        0
+      ],
+      "addedVelocity": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        2
+      ],
+      "addedVelocity": [
+        0.923578084,
+        0.161626205,
+        -0.900488853
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        5
+      ],
+      "addedVelocity": [
+        2.30894566,
+        0.40406546,
+        -2.25122213
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        14
+      ],
+      "addedVelocity": [
+        5.96773672,
+        1.04435396,
+        -5.81854343
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        23
+      ],
+      "addedVelocity": [
+        8.9871273,
+        1.57274747,
+        -8.76244926
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        46
+      ],
+      "addedVelocity": [
+        9.80413818,
+        1.71572447,
+        -9.55903625
+      ]
+    },
+    {
+      "relativePosition": [
+        0.799999952,
+        0.399999976,
+        -1.20000005
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        60
+      ],
+      "addedVelocity": [
+        9.80413818,
+        1.71572447,
+        -9.55903625
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        0
+      ],
+      "addedVelocity": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        2
+      ],
+      "addedVelocity": [
+        0,
+        -0.273723125,
+        -1.27085626
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        5
+      ],
+      "addedVelocity": [
+        0,
+        -0.684307933,
+        -3.17714071
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        14
+      ],
+      "addedVelocity": [
+        0,
+        -1.76867294,
+        -8.21168709
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        23
+      ],
+      "addedVelocity": [
+        0,
+        -2.66353703,
+        -12.3664112
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        46
+      ],
+      "addedVelocity": [
+        0,
+        -2.90567684,
+        -13.4906282
+      ]
+    },
+    {
+      "relativePosition": [
+        0,
+        -0.600000024,
+        -1.5
+      ],
+      "relativeVelocity": [
+        0,
+        0,
+        60
+      ],
+      "addedVelocity": [
+        0,
+        -2.90567684,
+        -13.4906282
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "speed": 2,
+      "velocity": [
+        0,
+        0.954057515,
+        -3.32269454
+      ]
+    },
+    {
+      "speed": 4,
+      "velocity": [
+        0,
+        1.65566254,
+        -5.65196943
+      ]
+    },
+    {
+      "speed": 7,
+      "velocity": [
+        0,
+        2.71822786,
+        -9.37974739
+      ]
+    },
+    {
+      "speed": 14,
+      "velocity": [
+        0,
+        5.31420517,
+        -18.2577229
+      ]
+    },
+    {
+      "speed": 23,
+      "velocity": [
+        0,
+        8.95991898,
+        -28.9810047
+      ]
+    }
+  ]
+}

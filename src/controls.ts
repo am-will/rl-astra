@@ -122,7 +122,11 @@ export class Controls {
     const value = (action: ActionId) => this.value(action);
     const pitch = clamp((value('pitchUp') - value('pitchDown')) * this.settings.aerialSensitivity);
     const yaw = clamp((value('yawLeft') - value('yawRight')) * this.settings.aerialSensitivity);
-    const directRoll = value('rollLeft') - value('rollRight'), modifier = value('airRoll') > .5;
+    const rollLeft = value('rollLeft'), rollRight = value('rollRight');
+    const directRoll = rollLeft - rollRight;
+    // A directional binding wins over the modifier, including when both
+    // share Square. Keep yaw available for directional aerial control.
+    const modifier = value('airRoll') > .5 && rollLeft === 0 && rollRight === 0;
     const dodge = Math.abs(pitch) + Math.abs(yaw) + Math.abs(directRoll) >= this.settings.dodgeDeadzone;
     const jump = this.jumpQueued; this.jumpQueued = false;
     return { ...emptyInput(), throttle: value('forward') - value('reverse'), steer: clamp((value('left') - value('right')) * this.settings.steeringSensitivity), pitch, yaw: modifier ? 0 : yaw, roll: clamp(directRoll + (modifier ? yaw : 0)), boost: value('boost') > .5, drift: value('drift') > .5, jump, jumpHeld: value('jump') > .5, dodgeForward: dodge ? -pitch : 0, dodgeSide: dodge ? clamp(yaw + directRoll) : 0 };

@@ -38,7 +38,7 @@ try{
  });
  check('Player and bot ball contacts produce no impact particles',contacts.every(c=>c.hits>0&&c.particles===0&&c.drawn===0),contacts);
  const trail=await p.evaluate(async()=>{
-  const T=await import('/node_modules/.vite/deps/three.js'),{BallSpeedTrail}=await import('/src/ball-speed-trail.ts'),rows=[];
+  const T=await import('/node_modules/.vite/deps/three.js'),{BallSpeedTrail}=await import('/src/ball-speed-trail.ts'),{FIELD}=await import('/src/config.ts'),rows=[];
   for(const hz of [30,60,144]){
    const scene=new T.Scene(),trail=new BallSpeedTrail(scene),pos=new T.Vector3(0,4,0),velocity=new T.Vector3(18,-6,-30).setLength(36),u=trail.mesh.material.uniforms;
    for(let i=0;i<hz;i++)trail.update(pos,new T.Vector3(0,0,-10),1/hz,true);
@@ -55,11 +55,11 @@ try{
    const faded=!trail.mesh.visible;
    for(let i=0;i<hz;i++)trail.update(pos,velocity,1/hz,true);
    trail.update(pos,velocity,0,false);
-   rows.push({hz,slowHidden,moderateVisible,moderateStrength,moderateLength,visible,strength,length,aligned,headOffset,paused,fading,faded,hiddenClears:!trail.mesh.visible,objects:scene.children.length,vertices:trail.mesh.geometry.getAttribute('position').count});
+   rows.push({hz,slowHidden,moderateVisible,moderateStrength,moderateLength,visible,strength,length,aligned,headOffset,ballRadius:FIELD.ballRadius,paused,fading,faded,hiddenClears:!trail.mesh.visible,objects:scene.children.length,vertices:trail.mesh.geometry.getAttribute('position').count});
    trail.mesh.geometry.dispose();trail.mesh.material.dispose();
   }return rows;
  });
- check('Supersonic ball has one straight streak attached behind it, with no particle wake',trail.every(t=>t.slowHidden&&t.visible&&t.objects===1&&t.vertices===4&&t.aligned<-.999&&Math.abs(t.headOffset-.736)<.001),trail);
+ check('Supersonic ball has one straight streak attached behind it, with no particle wake',trail.every(t=>t.slowHidden&&t.visible&&t.objects===1&&t.vertices===4&&t.aligned<-.999&&Math.abs(t.headOffset-t.ballRadius*.8)<.001),trail);
  check('Moderate hits show a substantial streak before supersonic speed',trail.every(t=>t.moderateVisible&&t.moderateStrength>.45&&t.moderateStrength<.55&&t.moderateLength>11.9&&t.moderateLength<12.1),trail);
  check('Ball streak fades out as speed drops and clears when the ball is hidden',trail.every(t=>t.paused&&t.fading>0&&t.fading<t.strength*.3&&t.faded&&t.hiddenClears),trail);
  check('Long streak length and brightness stay consistent at 30, 60 and 144 Hz',trail.every(t=>t.length>17.9&&t.length<18.01&&t.strength>.99),trail);

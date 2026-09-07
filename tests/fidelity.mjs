@@ -8,8 +8,26 @@ try{
  const p=await browser.newPage({viewport:{width:1440,height:900}});p.on('pageerror',e=>errors.push(e.message));p.on('console',e=>{if(e.type()==='error')errors.push(e.text())});
  const ready=()=>p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
  await p.goto('http://127.0.0.1:5179');await ready();
+ check('Fresh sessions disable camera shake and default to Inferno',await p.evaluate(()=>!window.__game.view.followCamera.settings.shake&&window.__game.view.boostStyle==='inferno'),{});
+ const shake=await p.evaluate(()=>{
+  const g=window.__game,v=g.view,rows=[],random=Math.random;
+  g.scenario('drive');v.ballCam=false;
+  try {
+   Math.random=()=>.75;
+   for(const source of ['hit','goal'])for(const enabled of [false,true]){
+    v.effects.explosion.reset();v.shake=source==='hit'?1:0;
+    if(source==='goal')v.effects.goal(v.ball.position,0xff8800);
+    v.followCamera.settings.shake=enabled;v.cameraReady=false;v.update(.3,'playing');
+    const expected=v.followCamera.look.clone().addScaledVector(v.camera.getWorldDirection(v.look.clone()),-8);
+    rows.push({source,enabled,offset:v.camera.position.distanceTo(expected),impact:v.effects.explosion.impact});
+   }
+  } finally {Math.random=random;v.followCamera.settings.shake=false;v.shake=0;v.effects.explosion.reset();v.cameraReady=false;}
+  return rows;
+ });
+ check('Camera shake gates both hit and goal-explosion movement',shake.every(r=>r.enabled?r.offset>.001:r.offset<1e-8)&&shake.filter(r=>r.source==='goal').every(r=>r.impact>0),shake);
  await p.evaluate(()=>{const g=window.__game;g.scenario('drive');g.view.ballCam=false;g.view.cameraReady=false;g.action('pause');});
  await p.locator('[data-action="visuals"]').click();
+ await p.locator('#camera-shake').selectOption('on');
  check('Camera and visuals opens as the active paused dialog',await p.evaluate(()=>window.__game.paused&&window.__game.visualSettings.visible&&document.querySelector('#pause-panel').hidden),{});
  for(const [key,value]of Object.entries({fov:86,height:3.1,distance:6.7,angle:18}))await p.locator(`#camera-${key}`).fill(String(value));
  await p.locator('#visual-quality').selectOption('ultra');await p.locator('#boost-style').selectOption('inferno');
@@ -23,9 +41,9 @@ try{
  check('Controller navigation adjusts ranges and boost selector',await p.evaluate(()=>Math.abs(window.__game.view.followCamera.settings.height-3.15)<.001&&window.__game.view.boostStyle==='inferno'),{});
  await p.reload();await ready();
  const saved=await p.evaluate(()=>({settings:window.__game.view.followCamera.settings,quality:window.__game.view.qualityLevel,style:window.__game.view.boostStyle,grass:window.__game.view.stadium.grass.mesh.visible}));
- check('Camera, Ultra and boost style all persist after reload',saved.settings.fov===87&&saved.settings.height===3.15&&saved.settings.distance===6.7&&saved.settings.angle===18&&saved.quality==='ultra'&&saved.style==='inferno'&&saved.grass,saved);
+ check('Camera, Ultra and boost style all persist after reload',saved.settings.shake===true&&saved.settings.fov===87&&saved.settings.height===3.15&&saved.settings.distance===6.7&&saved.settings.angle===18&&saved.quality==='ultra'&&saved.style==='inferno'&&saved.grass,saved);
  await p.evaluate(()=>{window.__game.action('visuals');});await p.locator('#reset-camera').click();await p.locator('#preview-camera').click();await p.waitForTimeout(60);
- check('Reset restores only camera defaults',await p.evaluate(()=>{const v=window.__game.view;return v.followCamera.settings.fov===69&&v.followCamera.settings.distance===4.9&&v.qualityLevel==='ultra'&&v.boostStyle==='inferno';}),{});
+ check('Reset restores only camera defaults',await p.evaluate(()=>{const v=window.__game.view;return !v.followCamera.settings.shake&&v.followCamera.settings.fov===69&&v.followCamera.settings.distance===4.9&&v.qualityLevel==='ultra'&&v.boostStyle==='inferno';}),{});
  await p.keyboard.press('Escape');check('Escape returns to pause before resuming play',await p.evaluate(()=>!window.__game.visualSettings.visible&&window.__game.paused&&!document.querySelector('#pause-panel').hidden),{});
  await p.keyboard.press('Escape');check('Second Escape resumes the field',await p.evaluate(()=>!window.__game.paused&&!window.__game.controls.menu),{});
  const fx=await p.evaluate(async()=>{const T=await import('/node_modules/.vite/deps/three.js'),g=window.__game,v=g.view;g.testing=true;const effect=v.infernos[0],rows=[];
@@ -40,9 +58,11 @@ try{
  const mobile=await p.evaluate(()=>{const r=document.querySelector('.visual-menu').getBoundingClientRect(),close=document.querySelector('#close-visuals').getBoundingClientRect();return{x:r.x,right:r.right,bottom:r.bottom,close:close.bottom,width:innerWidth,height:innerHeight};});
  check('Mobile settings keep the panel and Done button in view',mobile.x>=0&&mobile.right<=mobile.width&&mobile.bottom<=mobile.height&&mobile.close<=mobile.height,mobile);
  await p.screenshot({path:'test-results/fidelity/settings-mobile.png'});
- await p.evaluate(()=>{localStorage.setItem('champions-field.camera','{"fov":999,"height":null,"distance":-100,"angle":"bad"}');localStorage.setItem('champions-field.quality','invalid');localStorage.setItem('champions-field.boost-style','invalid');});await p.reload();await ready();
+ await p.evaluate(()=>{localStorage.setItem('champions-field.camera','{"fov":999,"height":null,"distance":-100,"angle":"bad","shake":"true"}');localStorage.setItem('champions-field.quality','invalid');localStorage.setItem('champions-field.boost-style','invalid');});await p.reload();await ready();
  const corrupt=await p.evaluate(()=>({camera:window.__game.view.followCamera.settings,quality:window.__game.view.qualityLevel,style:window.__game.view.boostStyle}));
- check('Invalid saved preferences clamp or fall back safely',corrupt.camera.fov===110&&corrupt.camera.height===2.05&&corrupt.camera.distance===2.8&&corrupt.camera.angle===10&&corrupt.quality==='high'&&corrupt.style==='classic',corrupt);
+ check('Invalid saved preferences clamp or fall back safely',corrupt.camera.shake===false&&corrupt.camera.fov===110&&corrupt.camera.height===2.05&&corrupt.camera.distance===2.8&&corrupt.camera.angle===10&&corrupt.quality==='high'&&corrupt.style==='inferno',corrupt);
+ await p.evaluate(()=>window.__game.view.setBoostStyle('classic'));await p.reload();await ready();
+ check('An explicitly saved Classic boost survives reload',await p.evaluate(()=>window.__game.view.boostStyle==='classic'),{});
  check('No browser or shader errors',errors.length===0,errors);
  await mkdir('test-results/fidelity',{recursive:true});await writeFile('test-results/fidelity/behavior.json',JSON.stringify({results,errors},null,2));
 }finally{await browser.close()}

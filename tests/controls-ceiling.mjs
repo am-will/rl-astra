@@ -18,7 +18,7 @@ const read=()=>page.evaluate(()=>window.__game.controls.read());
 const tap=async index=>{await button(index);await button(index,0);};
 try {
   await mkdir('test-results',{recursive:true});
-  await page.goto('http://127.0.0.1:5179'); await page.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
+  await page.goto(process.env.GAME_URL || 'http://127.0.0.1:5179'); await page.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));
   const ceiling = await page.evaluate(async()=>{
     const {Quaternion,Vector3}=await import('/node_modules/.vite/deps/three.js'); const g=window.__game;const runs=[];
     for(const speed of [0,5,20]){

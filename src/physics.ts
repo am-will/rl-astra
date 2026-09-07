@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-deterministic-compat';
 import { Vector3, Quaternion, Matrix4, MathUtils } from 'three';
 import { FIELD, CAR, STEP, type Input } from './config';
 import { arenaSurfaces, goalArchHeight } from './arena';
+import { BALL, ballHitVelocity } from './ball-physics';
 
 const UP = new Vector3(0, 1, 0);
 const v3 = (v: { x: number; y: number; z: number }) => new Vector3(v.x, v.y, v.z);
@@ -13,6 +14,9 @@ const FLIP_MAX_SPIN = 5.5 * FLIP_SPEED_SCALE;
 const AIR_TORQUE_SCALE = 2 * Math.PI / 65536 * 1000;
 const STEERING_CURVE = [[0, .53356], [5, .31930], [10, .18203], [15, .10570], [17.5, .08507], [30, .03454]];
 const COAST_FRICTION_CURVE = [[0, .1], [.7075, .5], [1, 1]];
+// Disjoint pairs let Rapier JS use RocketSim's separate ball materials without
+// changing chassis/arena contact or applying two impulses for one collision.
+const COLLISION_GROUPS = { arena: 0x00010006, car: 0x0002000b, ballWorld: 0x00040001, ballCar: 0x00080002 };
 function curve(points: number[][], value: number) {
   for (let i = 1; i < points.length; i++) {
     if (value <= points[i][0]) return MathUtils.lerp(points[i - 1][1], points[i][1], MathUtils.clamp((value - points[i - 1][0]) / (points[i][0] - points[i - 1][0]), 0, 1));
@@ -25,7 +29,7 @@ export interface PhysicsCheckpoint {
   world: Uint8Array;
   cars: CarMemory[];
   handles: number[][];
-  ball: number; ballCollider: number;
+  ball: number; ballCollider: number; ballWorldCollider: number;
   pads: Pad[]; unlimited: boolean; botEnabled: boolean;
 }
 export interface Car {
@@ -33,6 +37,7 @@ export interface Car {
   jumpCount: number; airTime: number; jumpTime: number; flipTime: number; flipAxis: Vector3; pitchLock: number;
   boosting: boolean; speed: number; supersonic: boolean; supersonicGrace: number; touchCooldown: number; resetCooldown: number; demolished: number;
   steer: number; drifting: boolean; handbrake: number; throttle: number;
+  ballHitCooldown: number;
   previousPosition: Vector3; previousRotation: Quaternion;
   recoveryTime: number; recoveryStart: Quaternion; recoveryTarget: Quaternion;
   blastTime: number;
@@ -46,6 +51,7 @@ export class Physics {
   world!: RAPIER.World;
   ball!: RAPIER.RigidBody;
   ballCollider!: RAPIER.Collider;
+  ballWorldCollider!: RAPIER.Collider;
   ballPreviousPosition = new Vector3(); ballPreviousRotation = new Quaternion();
   player!: Car;
   bot!: Car;
@@ -57,6 +63,8 @@ export class Physics {
   // never infer gameplay collision roles from that wrapper cache after rollback.
   isArenaCollider(collider: RAPIER.Collider) { return this.arenaColliders.has(collider.handle); }
   private incomingCarVelocities = [new Vector3(), new Vector3()];
+  private incomingCarPositions = [new Vector3(), new Vector3()];
+  private incomingCarForwards = [new Vector3(), new Vector3()];
   unlimited = false;
   botEnabled = true;
   onHit: (position: Vector3, speed: number, player: boolean) => void = () => {};
@@ -79,12 +87,13 @@ export class Physics {
   checkpoint(): PhysicsCheckpoint {
     return { world: this.world.takeSnapshot(), cars: [this.player, this.bot].map(c => this.carMemory(c)),
       handles: [this.player, this.bot].map(c => [c.body.handle, c.collider.handle]), ball: this.ball.handle,
-      ballCollider: this.ballCollider.handle, pads: this.pads.map(p => ({ ...p })), unlimited: this.unlimited, botEnabled: this.botEnabled };
+      ballCollider: this.ballCollider.handle, ballWorldCollider: this.ballWorldCollider.handle, pads: this.pads.map(p => ({ ...p })), unlimited: this.unlimited, botEnabled: this.botEnabled };
   }
   restore(saved: PhysicsCheckpoint) {
     const world = RAPIER.World.restoreSnapshot(saved.world);
     const old = this.world; this.world = world;
     this.ball = world.getRigidBody(saved.ball); this.ballCollider = world.getCollider(saved.ballCollider);
+    this.ballWorldCollider = world.getCollider(saved.ballWorldCollider);
     [this.player, this.bot].forEach((car, index) => {
       for (const [key, value] of Object.entries(saved.cars[index])) {
         const target = (car as unknown as Record<string, unknown>)[key];
@@ -111,12 +120,14 @@ export class Physics {
     this.world.timestep = STEP;
     this.world.numSolverIterations = 8;
     this.buildArena();
-    this.world.forEachCollider(c => this.arenaColliders.add(c.handle));
-    this.ball = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, FIELD.ballRadius + .08, 0).setLinearDamping(.045).setAngularDamping(.13).setCcdEnabled(true));
-    // Explicit pair friction keeps the ball's existing response while letting
-    // the chassis slide without the arena's friction dominating it. Max wins
-    // over the car's Min: ball/car=.225, ball/floor=.5, ball/wall=.475.
-    this.ballCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(30).setRestitution(.55).setFriction(.225).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max), this.ball);
+    this.world.forEachCollider(c => { this.arenaColliders.add(c.handle); c.setCollisionGroups(COLLISION_GROUPS.arena); });
+    this.ball = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, FIELD.ballRadius + .08, 0).setCcdEnabled(true));
+    this.ballCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(BALL.mass)
+      .setCollisionGroups(COLLISION_GROUPS.ballCar).setRestitution(BALL.carRestitution).setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+      .setFriction(BALL.carFriction).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max), this.ball);
+    this.ballWorldCollider = this.world.createCollider(RAPIER.ColliderDesc.ball(FIELD.ballRadius).setMass(0)
+      .setCollisionGroups(COLLISION_GROUPS.ballWorld).setRestitution(BALL.worldRestitution).setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+      .setFriction(BALL.worldFriction).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min), this.ball);
     this.player = this.createCar(0, 29, 0);
     this.bot = this.createCar(0, -29, Math.PI);
     for (const z of [-35, -18, 0, 18, 35]) for (const x of [-19, 0, 19]) {
@@ -145,8 +156,8 @@ export class Physics {
 
   createCar(x: number, z: number, yaw: number): Car {
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x, .38, z).setRotation(new Quaternion().setFromAxisAngle(UP, yaw)).setLinearDamping(.05).setAngularDamping(0).setCcdEnabled(true).setCanSleep(false));
-    const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setFriction(.2).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(.08), body);
-    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, handbrake: 0, throttle: 0, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
+    const collider = this.world.createCollider(RAPIER.ColliderDesc.roundCuboid(.44, .15, .695, .04).setMass(180).setCollisionGroups(COLLISION_GROUPS.car).setFriction(.2).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(.08), body);
+    return { body, collider, previousPosition: v3(body.translation()), previousRotation: new Quaternion().copy(body.rotation()), boost: 100, grounded: false, groundNormal: UP.clone(), wheels: 0, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, flipAxis: new Vector3(), pitchLock: 0, boosting: false, speed: 0, supersonic: false, supersonicGrace: 0, touchCooldown: 0, ballHitCooldown: 0, resetCooldown: 0, demolished: 0, steer: 0, drifting: false, handbrake: 0, throttle: 0, recoveryTime: 0, recoveryStart: new Quaternion(), recoveryTarget: new Quaternion(), blastTime: 0 };
   }
   resetCar(car: Car, x = 0, z = car === this.player ? 29 : -29, yaw = car === this.player ? 0 : Math.PI) {
     car.body.setEnabled(car !== this.bot || this.botEnabled);
@@ -157,7 +168,7 @@ export class Physics {
     car.body.resetForces(true);
     car.previousPosition.copy(car.body.translation()); car.previousRotation.copy(car.body.rotation());
     car.groundNormal.copy(UP);
-    Object.assign(car, { speed: 0, supersonic: false, supersonicGrace: 0, steer: 0, drifting: false, handbrake: 0, throttle: 0, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
+    Object.assign(car, { speed: 0, supersonic: false, supersonicGrace: 0, steer: 0, drifting: false, handbrake: 0, throttle: 0, boosting: false, grounded: false, wheels: 0, touchCooldown: 0, ballHitCooldown: 0, boost: 100, jumpCount: 0, airTime: 0, jumpTime: 0, flipTime: 0, pitchLock: 0, recoveryTime: 0, demolished: 0, resetCooldown: 0, blastTime: 0 });
   }
   reset() {
     this.resetCar(this.player); this.resetCar(this.bot);
@@ -225,7 +236,7 @@ export class Physics {
       const origin = new Vector3(x, -.03, z).applyQuaternion(q).add(pos);
       const ray = new RAPIER.Ray(origin, up.clone().negate());
       const hit = this.world.castRayAndGetNormal(ray, .62, true, undefined, undefined, car.collider, body);
-      if (hit && hit.collider.handle === this.ballCollider.handle && hit.timeOfImpact < .60 && v3(hit.normal).dot(up) > .25) ballContacts++;
+      if (hit && (hit.collider.handle === this.ballCollider.handle || hit.collider.handle === this.ballWorldCollider.handle) && hit.timeOfImpact < .60 && v3(hit.normal).dot(up) > .25) ballContacts++;
       if (hit && hit.timeOfImpact < .425 && v3(hit.normal).dot(up) > .25) {
         contacts++; normal.add(v3(hit.normal));
         tireOffsets.push(origin.clone().addScaledVector(up, -hit.timeOfImpact).sub(pos));
@@ -360,7 +371,8 @@ export class Physics {
         const yaw = input.yaw ?? input.steer;
         angular.y += (yaw * 95 - angular.y * 20 * (1 - Math.abs(yaw))) * scale * dt;
         if (recovering && input.roll === 0) angular.z *= Math.exp(-12.5 * dt);
-        else angular.z += (-input.roll * 400 - angular.z * 50) * scale * dt;
+        // Positive roll is left: with the nose along -Z, +Z tips the roof left.
+        else angular.z += (input.roll * 400 - angular.z * 50) * scale * dt;
         const spinLimit = car.pitchLock > 0 ? FLIP_MAX_SPIN : 5.5;
         if (angular.length() > spinLimit) angular.setLength(spinLimit);
         body.setAngvel(angular.applyQuaternion(q), true);
@@ -417,7 +429,7 @@ export class Physics {
         angular.x -= angular.x * 30 * AIR_TORQUE_SCALE * flipDt;
         const yaw = input.yaw ?? input.steer;
         angular.y += (yaw * 95 - angular.y * 20 * (1 - Math.abs(yaw))) * AIR_TORQUE_SCALE * flipDt;
-        angular.z += (-input.roll * 400 - angular.z * 50) * AIR_TORQUE_SCALE * flipDt;
+        angular.z += (input.roll * 400 - angular.z * 50) * AIR_TORQUE_SCALE * flipDt;
       }
       body.setAngvel(angular.applyQuaternion(q), true);
       // Preserve the start of the jump, then briefly arrest vertical movement
@@ -475,9 +487,16 @@ export class Physics {
     const incomingBallVelocity = v3(this.ball.linvel());
     this.updateCar(this.player, input, dt);
     if (this.botEnabled) this.updateCar(this.bot, botInput, dt);
-    this.incomingCarVelocities[0].copy(this.player.body.linvel());
-    this.incomingCarVelocities[1].copy(this.bot.body.linvel());
+    [this.player, this.bot].forEach((car, i) => {
+      this.incomingCarVelocities[i].copy(car.body.linvel());
+      this.incomingCarPositions[i].copy(car.body.translation());
+      this.incomingCarForwards[i].set(0, 0, -1).applyQuaternion(car.body.rotation());
+    });
     this.bot.body.setEnabled(this.botEnabled && this.bot.demolished <= 0);
+    // Bullet damps existing velocity before gravity/contacts, using (1-drag)^dt.
+    // Rapier's damping law differs; applying this explicitly also leaves spin alone.
+    const dampedBallVelocity = incomingBallVelocity.clone().multiplyScalar(Math.pow(1 - BALL.drag, STEP));
+    if (this.ball.isEnabled() && !this.ball.isSleeping()) this.ball.setLinvel(dampedBallVelocity, false);
     this.world.step();
     // The reference caps stored spin after integrating torque and collisions.
     // Capping before the solver also caps this tick's torque-driven rotation.
@@ -490,41 +509,30 @@ export class Physics {
       const impact = v3(this.ball.linvel()).sub(incomingBallVelocity).length();
       if (impact > 2) {
         let arenaContact = false;
-        this.world.contactPairsWith(this.ballCollider, other => { if (this.isArenaCollider(other)) arenaContact = true; });
+        this.world.contactPairsWith(this.ballWorldCollider, other => { if (this.isArenaCollider(other)) arenaContact = true; });
         if (arenaContact) this.onBounce(v3(this.ball.translation()), impact);
       }
     }
     for (const car of [this.player, ...(this.botEnabled ? [this.bot] : [])]) {
       car.touchCooldown = Math.max(0, car.touchCooldown - dt);
+      car.ballHitCooldown = Math.max(0, car.ballHitCooldown - 1);
       let touching = false;
-      this.world.contactPair(car.collider, this.ballCollider, manifold => { if (manifold.numContacts() > 0) touching = true; });
+      if (this.ball.isEnabled() && car.body.isEnabled()) this.world.contactPair(car.collider, this.ballCollider, manifold => {
+        for (let i = 0; i < manifold.numContacts(); i++) if (manifold.contactDist(i) <= .001) touching = true;
+      });
+      if (touching && car.ballHitCooldown === 0) {
+        const slot = car === this.player ? 0 : 1, incoming = this.incomingCarVelocities[slot];
+        // Use the incoming state for both cars, then add each cached impulse
+        // after the solver. One car's extra impulse must not amplify the other's.
+        const relativePosition = this.ballPreviousPosition.clone().sub(this.incomingCarPositions[slot]);
+        const forward = this.incomingCarForwards[slot];
+        const addedVelocity = ballHitVelocity(relativePosition, dampedBallVelocity.clone().sub(incoming), forward);
+        if (addedVelocity.lengthSq() > 0) this.ball.setLinvel(v3(this.ball.linvel()).add(addedVelocity), true);
+        car.ballHitCooldown = 2;
+      }
       if (touching && car.touchCooldown === 0) {
-        const delta = v3(this.ball.translation()).sub(v3(car.body.translation())).normalize();
-        const speed = v3(car.body.linvel()).length();
-        const impulse = delta.clone().multiplyScalar(30 * (1.3 + speed * .26));
-        impulse.y += 16.5 + speed * .85;
-        this.ball.applyImpulse(impulse, true);
-        // Trim the velocity gained from a gentle touch, preserving incoming
-        // ball momentum and the existing power of fast hits. Only head-on,
-        // grounded touches receive the very small extra reduction in lift.
-        const strength = .9 + .1 * MathUtils.smoothstep(speed, 3, 11);
-        const gain = v3(this.ball.linvel()).sub(incomingBallVelocity).multiplyScalar(strength);
-        const forward = new Vector3(0, 0, -1).applyQuaternion(car.body.rotation());
-        if (car.grounded && delta.dot(forward) > .65 && gain.y > 0) gain.y *= .96;
-        this.ball.setLinvel(incomingBallVelocity.clone().add(gain), true);
-        incomingBallVelocity.copy(this.ball.linvel());
-        // Keep a fast, square hit from draining the car's entire speed margin.
-        // Restore part of the forward loss only at high speed, after computing
-        // the ball response, so gentle touches and ball power stay unchanged.
-        const incoming = this.incomingCarVelocities[car === this.player ? 0 : 1];
-        if (car.grounded && delta.dot(forward) > .65) {
-          const retained = .75 * MathUtils.smoothstep(incoming.length(), 15, CAR.supersonic);
-          const current = v3(car.body.linvel()), loss = Math.max(0, incoming.dot(forward) - current.dot(forward));
-          current.addScaledVector(forward, loss * retained);
-          car.body.setLinvel(current, true);
-        }
         car.touchCooldown = .18;
-        this.onHit(v3(this.ball.translation()), speed, car === this.player);
+        this.onHit(v3(this.ball.translation()), this.incomingCarVelocities[car === this.player ? 0 : 1].length(), car === this.player);
       }
       if (car.demolished <= 0 && car.boost < 100 && car.body.translation().y < 1.1) for (const pad of this.pads) {
         if (pad.cooldown <= 0 && this.overlapsPad(car, pad) && car.boost < 100) {
@@ -541,8 +549,8 @@ export class Physics {
       });
       if (victim) this.demolish(victim);
     }
-    const bv = v3(this.ball.linvel()); if (bv.length() > 60) this.ball.setLinvel(bv.setLength(60), true);
-    const angular = v3(this.ball.angvel()); if (angular.length() > 6) this.ball.setAngvel(angular.setLength(6), true);
+    const bv = v3(this.ball.linvel()); if (bv.length() > BALL.maxSpeed) this.ball.setLinvel(bv.setLength(BALL.maxSpeed), true);
+    const angular = v3(this.ball.angvel()); if (angular.length() > BALL.maxSpin) this.ball.setAngvel(angular.setLength(BALL.maxSpin), true);
     for (const pad of this.pads) pad.cooldown = Math.max(0, pad.cooldown - dt);
   }
   private overlapsPad(car: Car, pad: Pad) {
