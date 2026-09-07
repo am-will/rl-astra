@@ -1,5 +1,5 @@
 import {chromium} from 'playwright';import assert from 'node:assert/strict';import {mkdir,writeFile} from 'node:fs/promises';
-await mkdir('test-results/feel/live',{recursive:true});const b=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox']});
+await mkdir('test-results/feel/live',{recursive:true});const b=await chromium.launch({headless:true,executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox']});
 const context=await b.newContext({viewport:{width:1440,height:900},recordVideo:{dir:'test-results/feel/live',size:{width:1440,height:900}}});const p=await context.newPage(),reports=[],errors=[];p.on('pageerror',e=>errors.push(e.message));await p.addInitScript(()=>Object.defineProperty(navigator,'getGamepads',{value:()=>[]}));
 try{
 await p.goto('http://127.0.0.1:5179');await p.waitForFunction(()=>window.__game?.view&&!document.querySelector('#loading'));

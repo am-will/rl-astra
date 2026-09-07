@@ -107,7 +107,7 @@ try{
  });
  check('Camera switching settles in about half the previous 0.77 seconds',cameras.every(r=>r.settled>=.3&&r.settled<=.43),cameras);
  const ends=await page.evaluate(async()=>{
-  const {FIELD}=await import('/src/config.ts'),R=await import('/node_modules/.vite/deps/@dimforge_rapier3d-compat.js'),g=window.__game,rows=[];
+  const {FIELD}=await import('/src/config.ts'),R=await import('/node_modules/.vite/deps/@dimforge_rapier3d-deterministic-compat.js'),g=window.__game,rows=[];
   for(const end of [-1,1])for(const side of [-1,1])for(const distance of [.3,1.5]){
    const x=side*(FIELD.goalWidth+distance),z=end*(FIELD.length-(distance===1.5?.7:.08)),hit=g.physics.world.castRayAndGetNormal(new R.Ray({x,y:5,z},{x:0,y:-1,z:0}),6,true,R.QueryFilterFlags.EXCLUDE_DYNAMIC);
    rows.push({end,side,distance,height:hit?5-hit.timeOfImpact:null});

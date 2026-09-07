@@ -4,6 +4,7 @@ import { BoostGauge } from './boost-gauge';
 import { scoreNumerals } from './score-numerals';
 import { arenaLettering, goalAward } from './arena-lettering';
 import './original-hud.css';
+import './network/online.css';
 export type TextStyle = 'original' | 'cartoon';
 const icons = {
   pause: '<path d="M8 5v14M16 5v14"/>',

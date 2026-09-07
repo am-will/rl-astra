@@ -25,6 +25,7 @@ import { BOOST_OUTLET } from './octane-outlets';
 import { BallDirection } from './ball-direction';
 import { TurfDebris } from './turf-debris';
 import { CarPaint, validPaintJob, type PaintJob } from './car-paint';
+import type { CorrectionSample } from './network/prediction';
 import { createUltraSky } from './ultra-sky';
 import { UltraOcclusion } from './ultra-occlusion';
 import { CinematicMotionPass, createCinematicGrade } from './cinematic-pass';
@@ -70,6 +71,28 @@ export class GameRenderer {
   look = new T.Vector3();
   cameraForward = new T.Vector3(0, 0, -1);
   cameraReady = false;
+  private networkRotations = [new T.Quaternion(), new T.Quaternion(), new T.Quaternion()];
+  private networkOffsets = [new T.Vector3(), new T.Vector3(), new T.Vector3()];
+  get localModel() { return this.physics.localSlot === 0 ? this.player : this.bot; }
+  get remoteModel() { return this.physics.localSlot === 0 ? this.bot : this.player; }
+  setOnlineSlot(slot: 0 | 1) {
+    this.carPaint?.set('classic');
+    this.physics.localSlot = slot; this.cameraReady = false;
+    this.carPaint = new CarPaint(this.localModel); this.carPaint.set(this.paintJob);
+    this.clearNetworkCorrection();
+  }
+  clearNetworkCorrection() { for (const offset of this.networkOffsets) offset.set(0, 0, 0); for (const rotation of this.networkRotations) rotation.identity(); }
+  correctNetwork(correction: CorrectionSample | null) {
+    if (!correction) return;
+    if (correction.transition) { this.clearNetworkCorrection(); return; }
+    for (let i = 0; i < 3; i++) {
+      this.networkRotations[i].multiply(new T.Quaternion().copy(correction.bodies[i].rotation)).normalize();
+      this.networkOffsets[i].add(new T.Vector3().copy(correction.bodies[i].offset));
+      // Teleports and respawns cut immediately; only small positional corrections ease out.
+      if (this.networkOffsets[i].length() > 3) { this.networkOffsets[i].set(0, 0, 0); this.networkRotations[i].identity(); }
+      if (this.networkRotations[i].angleTo(new T.Quaternion()) > 1.6) this.networkRotations[i].identity();
+    }
+  }
   followCamera = new FollowCamera();
   qualityLevel: QualityLevel = 'high';
   get quality() { return this.qualityLevel !== 'performance'; }
@@ -266,13 +289,17 @@ export class GameRenderer {
     this.syncCar(this.player, this.physics.player, dt, alpha); this.syncCar(this.bot, this.physics.bot, dt, alpha); this.bot.root.visible &&= this.physics.botEnabled;
     this.ball.visible = phase !== 'goal';
     this.ball.position.lerpVectors(this.physics.ballPreviousPosition, new T.Vector3().copy(this.physics.ball.translation()), alpha); this.ball.quaternion.slerpQuaternions(this.physics.ballPreviousRotation, new T.Quaternion().copy(this.physics.ball.rotation()), alpha);
+    for (const [i, model] of [this.player.root, this.bot.root, this.ball].entries()) {
+      this.networkOffsets[i].multiplyScalar(Math.exp(-dt / .065)); model.position.add(this.networkOffsets[i]);
+      this.networkRotations[i].slerp(new T.Quaternion(), 1 - Math.exp(-dt / .065)); model.quaternion.premultiply(this.networkRotations[i]);
+    }
     const ground = this.physics.groundBelow(this.ball.position);
     const markerRadius = 1.55 + Math.sqrt(Math.max(0, this.ball.position.y - ground.position.y - FIELD.ballRadius)) * .46;
     this.ballGround.scale.setScalar(markerRadius);
     this.ballGround.position.copy(ground.position).addScaledVector(ground.normal, .045);
     this.ballGround.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), ground.normal);
     this.ballGround.visible = phase !== 'goal';
-    this.ballDirection.update(this.player.root.position, this.ball.position, !this.ballCam && this.player.root.visible && phase !== 'goal' && phase !== 'ended');
+    this.ballDirection.update(this.localModel.root.position, this.ball.position, !this.ballCam && this.localModel.root.visible && phase !== 'goal' && phase !== 'ended');
     this.effects.ballStreak.update(this.ball.position, new T.Vector3().copy(this.physics.ball.linvel()), dt, this.ball.visible && phase === 'playing');
     for (const obj of this.scene.children) if (obj.name === 'contact-shadow') {
       const owner = obj.userData.owner as T.Object3D; obj.position.set(owner.position.x, .025, owner.position.z); obj.visible = owner.visible;
@@ -281,7 +308,7 @@ export class GameRenderer {
     this.stadium.update(this.physics.pads, this.time); this.effects.update(dt);
     this.bloom.strength = (this.qualityLevel === 'ultra' ? .44 : .36) + this.effects.explosion.impact * .3;
     this.renderer.toneMappingExposure = .97 - this.effects.explosion.impact * .12;
-    const car = this.physics.player, pos = this.player.root.position, q = this.player.root.quaternion;
+    const car = this.physics.localCar, pos = this.localModel.root.position, q = this.localModel.root.quaternion;
     if (this.playerWasDemolished && car.demolished <= 0) this.cameraReady = false;
     this.playerWasDemolished = car.demolished > 0;
     const cameraCut = !this.cameraReady;
@@ -305,10 +332,10 @@ export class GameRenderer {
     this.camera.updateMatrixWorld();
     this.motion.update(dt, car.speed, this.motionBlur && this.quality && !this.paintPreview && (phase === 'playing' || phase === 'goal'), cameraCut, pos, this.ball.position);
     this.supersonicStreaks.update(this.camera, pos, new T.Vector3().copy(car.body.linvel()), car.supersonic,
-      this.player.root.visible && !this.paintPreview && (phase === 'playing' || phase === 'goal'), dt);
+      this.localModel.root.visible && !this.paintPreview && (phase === 'playing' || phase === 'goal'), dt);
     this.effects.demolitions.updateCamera(this.camera.position);
     this.stadium.updateCamera(this.camera.position);
-    this.stadium.grass.update(this.camera.position, this.player.root.position, this.time);
+    this.stadium.grass.update(this.camera.position, this.localModel.root.position, this.time);
     this.sky.material.uniforms.skyTime.value = this.time;
     if (this.qualityLevel === 'ultra') this.updateSunShadow();
     const blastCenter = this.effects.explosion.root.position.clone().project(this.camera);

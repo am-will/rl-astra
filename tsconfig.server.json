@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "server",
+    "src/simulation.ts",
+    "src/network/authority.ts",
+    "src/network/prediction.ts",
+    "src/network/protocol.ts"
+  ]
+}

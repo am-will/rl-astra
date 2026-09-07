@@ -1,4 +1,4 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+import RAPIER from '@dimforge/rapier3d-deterministic-compat';
 import { Vector3, Quaternion, Matrix4, MathUtils } from 'three';
 import { FIELD, CAR, STEP, type Input } from './config';
 import { arenaSurfaces, goalArchHeight } from './arena';
@@ -20,6 +20,14 @@ function curve(points: number[][], value: number) {
   return points[points.length - 1][1];
 }
 export interface Pad { x: number; z: number; big: boolean; cooldown: number; }
+export type CarMemory = Record<string, number | boolean | number[]>;
+export interface PhysicsCheckpoint {
+  world: Uint8Array;
+  cars: CarMemory[];
+  handles: number[][];
+  ball: number; ballCollider: number;
+  pads: Pad[]; unlimited: boolean; botEnabled: boolean;
+}
 export interface Car {
   body: RAPIER.RigidBody; collider: RAPIER.Collider; boost: number; grounded: boolean; wheels: number;
   jumpCount: number; airTime: number; jumpTime: number; flipTime: number; flipAxis: Vector3; pitchLock: number;
@@ -31,6 +39,10 @@ export interface Car {
   groundNormal: Vector3;
 }
 export class Physics {
+  // Presentation ownership never changes canonical blue/orange simulation order.
+  localSlot: 0 | 1 = 0;
+  get localCar() { return this.localSlot === 0 ? this.player : this.bot; }
+  get remoteCar() { return this.localSlot === 0 ? this.bot : this.player; }
   world!: RAPIER.World;
   ball!: RAPIER.RigidBody;
   ballCollider!: RAPIER.Collider;
@@ -39,22 +51,67 @@ export class Physics {
   bot!: Car;
   pads: Pad[] = [];
   private cameraSolids = new Set<number>();
+  private arenaColliders = new Set<number>();
+  // Rapier 0.19.3 deserialization can cache a bogus JS parent for an unattached
+  // collider (undefined handle -> NaN -> arena index 0). Keep arena roles explicit;
+  // never infer gameplay collision roles from that wrapper cache after rollback.
+  isArenaCollider(collider: RAPIER.Collider) { return this.arenaColliders.has(collider.handle); }
   private incomingCarVelocities = [new Vector3(), new Vector3()];
   unlimited = false;
   botEnabled = true;
   onHit: (position: Vector3, speed: number, player: boolean) => void = () => {};
-  onPad: (big: boolean) => void = () => {};
-  onFlipReset: () => void = () => {};
+  onPad: (big: boolean, car?: Car) => void = () => {};
+  onFlipReset: (car?: Car) => void = () => {};
   onDemo: (car: Car) => void = () => {};
   onJump: (car: Car, dodge: boolean) => void = () => {};
   onLand: (car: Car, speed: number) => void = () => {};
   onBounce: (position: Vector3, speed: number) => void = () => {};
+  carMemory(car: Car): CarMemory {
+    const result: CarMemory = {};
+    for (const [key, value] of Object.entries(car)) {
+      if (key === 'body' || key === 'collider' || key.startsWith('previous')) continue;
+      if (typeof value === 'number' || typeof value === 'boolean') result[key] = value;
+      else if (value instanceof Vector3 || value instanceof Quaternion) result[key] = value.toArray();
+      else throw new Error(`Unserialized car field: ${key}`);
+    }
+    return result;
+  }
+  checkpoint(): PhysicsCheckpoint {
+    return { world: this.world.takeSnapshot(), cars: [this.player, this.bot].map(c => this.carMemory(c)),
+      handles: [this.player, this.bot].map(c => [c.body.handle, c.collider.handle]), ball: this.ball.handle,
+      ballCollider: this.ballCollider.handle, pads: this.pads.map(p => ({ ...p })), unlimited: this.unlimited, botEnabled: this.botEnabled };
+  }
+  restore(saved: PhysicsCheckpoint) {
+    const world = RAPIER.World.restoreSnapshot(saved.world);
+    const old = this.world; this.world = world;
+    this.ball = world.getRigidBody(saved.ball); this.ballCollider = world.getCollider(saved.ballCollider);
+    [this.player, this.bot].forEach((car, index) => {
+      for (const [key, value] of Object.entries(saved.cars[index])) {
+        const target = (car as unknown as Record<string, unknown>)[key];
+        if (Array.isArray(value) && (target instanceof Vector3 || target instanceof Quaternion)) target.fromArray(value);
+        else (car as unknown as Record<string, unknown>)[key] = value;
+      }
+      car.body = world.getRigidBody(saved.handles[index][0]); car.collider = world.getCollider(saved.handles[index][1]);
+      car.previousPosition.copy(car.body.translation()); car.previousRotation.copy(car.body.rotation());
+    });
+    // Keep pad identities: the stadium holds references to these objects.
+    saved.pads.forEach((pad, i) => Object.assign(this.pads[i], pad));
+    this.unlimited = saved.unlimited; this.botEnabled = saved.botEnabled;
+    this.ballPreviousPosition.copy(this.ball.translation()); this.ballPreviousRotation.copy(this.ball.rotation());
+    old.free();
+  }
+  canonicalState() {
+    return { cars: [this.player, this.bot].map(c => this.carMemory(c)),
+      bodies: [this.player.body, this.bot.body, this.ball].map(b => [b.translation(), b.rotation(), b.linvel(), b.angvel(), b.isEnabled(), b.isSleeping()]),
+      pads: this.pads.map(p => p.cooldown), unlimited: this.unlimited, botEnabled: this.botEnabled };
+  }
   async init() {
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -CAR.gravity, z: 0 });
     this.world.timestep = STEP;
     this.world.numSolverIterations = 8;
     this.buildArena();
+    this.world.forEachCollider(c => this.arenaColliders.add(c.handle));
     this.ball = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, FIELD.ballRadius + .08, 0).setLinearDamping(.045).setAngularDamping(.13).setCcdEnabled(true));
     // Explicit pair friction keeps the ball's existing response while letting
     // the chassis slide without the arena's friction dominating it. Max wins
@@ -215,7 +272,7 @@ export class Physics {
     car.resetCooldown = Math.max(0, car.resetCooldown - dt);
     if (ballContacts === 4 && car.resetCooldown === 0 && car.jumpCount > 0) {
       car.jumpCount = 0; car.airTime = 0; car.resetCooldown = .7;
-      if (car === this.player) this.onFlipReset();
+      this.onFlipReset(car);
     }
     car.speed = velocity.length();
     // RL's trail activates at 2200 uu/s and has a one-second grace band down
@@ -382,7 +439,7 @@ export class Physics {
       // turn toward wheel support. Free aerials and ball contacts get no help.
       const support = new Vector3();
       this.world.contactPairsWith(car.collider, other => {
-        if (other.parent()) return;
+        if (!this.isArenaCollider(other)) return;
         this.world.contactPair(car.collider, other, manifold => {
           for (let i = 0; i < manifold.numSolverContacts(); i++) {
             if (manifold.solverContactDist(i) > .015) continue;
@@ -433,7 +490,7 @@ export class Physics {
       const impact = v3(this.ball.linvel()).sub(incomingBallVelocity).length();
       if (impact > 2) {
         let arenaContact = false;
-        this.world.contactPairsWith(this.ballCollider, other => { if (!other.parent()) arenaContact = true; });
+        this.world.contactPairsWith(this.ballCollider, other => { if (this.isArenaCollider(other)) arenaContact = true; });
         if (arenaContact) this.onBounce(v3(this.ball.translation()), impact);
       }
     }
@@ -472,7 +529,7 @@ export class Physics {
       if (car.demolished <= 0 && car.boost < 100 && car.body.translation().y < 1.1) for (const pad of this.pads) {
         if (pad.cooldown <= 0 && this.overlapsPad(car, pad) && car.boost < 100) {
           car.boost = Math.min(100, car.boost + (pad.big ? 100 : 12)); pad.cooldown = pad.big ? 10 : 4;
-          if (car === this.player) this.onPad(pad.big);
+          this.onPad(pad.big, car);
         }
       }
     }

@@ -14,7 +14,7 @@ try {
   await page.goto('http://127.0.0.1:5179');
   await page.waitForFunction(() => window.__game?.view && !document.querySelector('#loading'));
   const shape = await page.evaluate(async () => {
-    const { default: R } = await import('/node_modules/.vite/deps/@dimforge_rapier3d-compat.js');
+    const { default: R } = await import('/node_modules/.vite/deps/@dimforge_rapier3d-deterministic-compat.js');
     const { FIELD: f } = await import('/src/config.ts');
     const { goalSideProfile, GOAL_PROFILE: profile } = await import('/src/arena.ts');
     const outline = goalSideProfile();

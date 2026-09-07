@@ -1,0 +1,128 @@
+{
+  "date": "2026-09-07T03:52:34.103Z",
+  "runtime": "v26.7.0",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "platform": "linux",
+  "arch": "x64",
+  "rapier": "0.19.3",
+  "scope": "Same Node process; two cars and one ball; real Rapier and game physics; no networking, browser rendering, or Game lifecycle.",
+  "stepMs": {
+    "count": 960,
+    "median": 0.03363000000001648,
+    "p95": 0.14984199999997827,
+    "max": 1.2451770000000124
+  },
+  "snapshotBytes": 12265550,
+  "snapshotMs": {
+    "count": 12,
+    "median": 2.4476920000000746,
+    "p95": 2.992919000000029,
+    "max": 2.992919000000029
+  },
+  "restoreMs": {
+    "count": 12,
+    "median": 2.7349550000000136,
+    "p95": 4.213244999999915,
+    "max": 4.213244999999915
+  },
+  "checkpoints": [
+    {
+      "tick": 120,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 240,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 360,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 480,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 600,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 720,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 840,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 960,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 1080,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    },
+    {
+      "tick": 1200,
+      "worldBytesEqual": true,
+      "observableStateEqual": true
+    }
+  ],
+  "replay": {
+    "worldBytesEqual": true,
+    "observableStateEqual": true,
+    "firstRestoreMs": 7.78427099999999,
+    "replay120Ms": 7.28296499999999
+  },
+  "cases": [
+    {
+      "scenario": "ball-strike",
+      "initialWorldBytesEqual": true,
+      "finalWorldBytesEqual": true,
+      "firstObservableMismatch": null,
+      "eventsEqual": true,
+      "events": [
+        "hit"
+      ]
+    },
+    {
+      "scenario": "head-on-cars",
+      "initialWorldBytesEqual": true,
+      "finalWorldBytesEqual": true,
+      "firstObservableMismatch": null,
+      "eventsEqual": true,
+      "events": [
+        "demo"
+      ]
+    },
+    {
+      "scenario": "wall-drive",
+      "initialWorldBytesEqual": true,
+      "finalWorldBytesEqual": true,
+      "firstObservableMismatch": null,
+      "eventsEqual": true,
+      "events": []
+    },
+    {
+      "scenario": "fresh-world-wall-drive",
+      "initialWorldBytesEqual": true,
+      "finalWorldBytesEqual": false,
+      "firstObservableMismatch": null
+    }
+  ],
+  "arena": {
+    "vertices": 46212,
+    "triangles": 86404,
+    "bytesBeforeRemovingBodies": 12266129,
+    "bytesAfterRemovingBodies": 12264542
+  }
+}

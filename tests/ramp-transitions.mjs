@@ -131,7 +131,7 @@ try {
   }
   console.log('PASS jumps release from both curves, vertical walls, and the ceiling at straight and diagonal angles');
 
-  const c = physics.player, R = (await import('@dimforge/rapier3d-compat')).default;
+  const c = physics.player, R = (await import('@dimforge/rapier3d-deterministic-compat')).default;
   physics.resetCar(c, 0, 0); c.body.setTranslation({ x: 0, y: 3, z: 0 }, true);
   const singleTire = physics.world.createCollider(R.ColliderDesc.cuboid(.1, .05, .1).setTranslation(.375, 3 - .335 - .05, -.475));
   physics.world.step(); physics.step(emptyInput(), emptyInput());

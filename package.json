@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5179 --strictPort",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build && node scripts/build-server.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node tests/gameplay.mjs && node tests/refinements.mjs && node tests/keyboard-dodge.mjs && node tests/dodge-interruption.mjs && node tests/controls-ceiling.mjs && node tests/feel.mjs && node tests/impact.mjs && node tests/speed.mjs && node tests/hud.mjs && node tests/original-hud.mjs && node tests/goals.mjs && node tests/practice.mjs && node tests/momentum.mjs && node tests/ramp-transitions.mjs && node tests/fidelity.mjs && node tests/paint.mjs && node tests/camera-modes.mjs && node tests/camera-ball.mjs && node tests/render-startup.mjs && node tests/camera-look.mjs && node tests/camera-fade.mjs && node tests/steering-boost.mjs && node tests/arena-polish.mjs && node tests/camera-turf.mjs && node tests/audio.mjs && node tests/ebrake-smoke.mjs && node tests/pad-pickups.mjs && node tests/ultra-fidelity.mjs && node tests/render-fixes.mjs && node tests/turf-contacts.mjs && node tests/stadium-presentation.mjs && node tests/boost-outlets.mjs && node tests/cinematic.mjs && node tests/physics-feel.mjs && node tests/handling.mjs && node tests/demolition-sparks.mjs",
     "test:goals": "node tests/goals.mjs",
@@ -44,15 +44,31 @@
     "test:cinematic": "node tests/cinematic.mjs",
     "test:handling": "node tests/handling.mjs",
     "test:physics-feel": "node tests/physics-feel.mjs",
-    "test:demolition-sparks": "node tests/demolition-sparks.mjs"
+    "test:demolition-sparks": "node tests/demolition-sparks.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "start:server": "node dist-server/index.mjs",
+    "test:netcode": "node tests/netcode.mjs",
+    "test:collisions": "node tests/collisions.mjs",
+    "test:multiplayer-browser": "node tests/browser-collisions.mjs",
+    "test:cross-runtime": "node tests/cross-runtime.mjs",
+    "test:server-safety": "node tests/server-safety.mjs",
+    "test:deployed": "node tests/deployed.mjs",
+    "verify:replay": "node scripts/verify-replay.mjs",
+    "test:slow-join": "BASELINE_DELAY=3500 SCENARIO=kickoff PROFILE=regional node tests/browser-collisions.mjs",
+    "test:turn-auth": "node tests/turn-auth.mjs"
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.19.3",
+    "@dimforge/rapier3d-deterministic-compat": "0.19.3",
     "@fontsource/barlow-condensed": "^5.3.0",
-    "three": "^0.183.2"
+    "node-datachannel": "0.33.2",
+    "three": "0.183.2",
+    "ws": "8.21.3"
   },
   "devDependencies": {
+    "@types/node": "26.4.1",
     "@types/three": "^0.183.1",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.28.2",
     "playwright": "^1.58.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
