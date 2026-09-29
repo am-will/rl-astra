@@ -129,7 +129,9 @@ export class Controls {
     const modifier = value('airRoll') > .5 && rollLeft === 0 && rollRight === 0;
     const dodge = Math.abs(pitch) + Math.abs(yaw) + Math.abs(directRoll) >= this.settings.dodgeDeadzone;
     const jump = this.jumpQueued; this.jumpQueued = false;
-    return { ...emptyInput(), throttle: value('forward') - value('reverse'), steer: clamp((value('left') - value('right')) * this.settings.steeringSensitivity), pitch, yaw: modifier ? 0 : yaw, roll: clamp(directRoll + (modifier ? yaw : 0)), boost: value('boost') > .5, drift: value('drift') > .5, jump, jumpHeld: value('jump') > .5, dodgeForward: dodge ? -pitch : 0, dodgeSide: dodge ? clamp(yaw + directRoll) : 0 };
+    // The car's local roll axis is opposite the left-stick yaw axis. Keeping
+    // the conversion here makes Square + right roll right on a DualSense.
+    return { ...emptyInput(), throttle: value('forward') - value('reverse'), steer: clamp((value('left') - value('right')) * this.settings.steeringSensitivity), pitch, yaw: modifier ? 0 : yaw, roll: clamp(directRoll + (modifier ? -yaw : 0)), boost: value('boost') > .5, drift: value('drift') > .5, jump, jumpHeld: value('jump') > .5, dodgeForward: dodge ? -pitch : 0, dodgeSide: dodge ? clamp(yaw + directRoll) : 0 };
   }
   cameraLook() { return this.menu || this.capture ? 0 : this.value('lookRight') - this.value('lookLeft'); }
   save() {

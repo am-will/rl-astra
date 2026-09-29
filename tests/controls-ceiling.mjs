@@ -40,7 +40,10 @@ try {
   await button(6,.65);input=await read();check('L2 preserves analog reverse',Math.abs(input.throttle+.65)<.001,input);await button(6,0);
   await axes(.05,-.08);input=await read();check('Stick drift stays inside deadzone',input.steer===0&&input.pitch===0,input);
   await axes(-.56,-.56);input=await read();check('Left stick steers and pitches proportionally',Math.abs(input.steer-.5)<.01&&Math.abs(input.pitch+.5)<.01,input);
-  await button(2);input=await read();check('Square powerslides and converts air yaw to roll',input.drift&&input.yaw===0&&input.roll>.49,input);await button(2,0);await axes(0,0);
+  // Square uses the stick as a directional air-roll modifier. Its roll sign
+  // deliberately opposes yaw so screen-right rolls the car right.
+  await button(2);input=await read();check('Square plus left stick rolls left',input.drift&&input.yaw===0&&input.roll<-.49,input);await button(2,0);
+  await axes(.56,0);await button(2);input=await read();check('Square plus right stick rolls right',input.drift&&input.yaw===0&&input.roll>.49,input);await button(2,0);await axes(0,0);
   await button(4);input=await read();check('L1 supplies directional air roll',input.roll===1,input);await button(4,0);
   await button(1);input=await read();check('Circle boosts',input.boost,input);await button(1,0);
   await button(0);input=await read();const held=await read();check('Cross jump is a single edge with continuous hold',input.jump&&input.jumpHeld&&!held.jump&&held.jumpHeld,{input,held});await button(0,0);
